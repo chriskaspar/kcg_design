@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# macOS
+.DS_Store
+
+# Local browser profiles used by automation
+ 
+# Local media assets (keep on disk, do not track in git)
+ 
+*.mp3
+*.mp4
+*.m4a
+*.wav
+*.mov
+*.mkv
+*.webm
+
+# Automation screenshots/images (errors/debug)
+*.png
+*.jpg
+*.jpeg
+*.webp
+ 
+# YouTube API OAuth secrets/tokens
+config/youtube-oauth-client.json
+state/tokens/*.json
+
+# Optional env files
+.env
+.env.*

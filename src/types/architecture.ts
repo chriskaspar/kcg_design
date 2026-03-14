@@ -1,18 +1,11 @@
 export type VendorId = "aws" | "azure" | "gcp" | "databricks" | "generic";
 
 export type WorkspaceTab =
-  | "Overview"
-  | "solution"
-  | "design"
+  | "Scenario"
   | "Discovery"
-  | "Problem Framing"
-  | "Architecture"
-  | "Meeting Prep"
-  | "Customer Questions"
-  | "Risks and Failure Modes"
-  | "Deliverables"
-  | "Executive Summary"
-  | "SA Toolkit";
+  | "Design"
+  | "Solution"
+  | "Story";
 export type BoardView = "executive" | "technical" | "dataflow" | "aiflow";
 
 export interface IconDefinition {
@@ -184,5 +177,7 @@ export interface SavedScenario {
   input: ScenarioInput;
   architecture: ArchitectureSpec;
   playbook: ScenarioPlaybook;
+  architectAnswers?: Record<string, string>;
+  story?: { strategy: string; technology: string; outcome: string; returnValue: string; years: string; } | null;
   updatedAt: string;
 }

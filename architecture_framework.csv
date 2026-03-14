@@ -1,0 +1,35 @@
+Pyramid Level,Stage,ARCHITECT Step,Word,Letter,Meaning,Architect Questions
+Executive,Discovery,Ask,WHY,W,Why,Why is the organization building this system? What problem are we solving?
+,,,,H,Humans,"Who are the humans/users interacting with the system? Analysts, engineers, applications?"
+,,,,Y,Yield,What value or business yield will this system produce?
+Executive,Problem Framing,Restate,GOAL,G,Goal,What is the primary goal of the system or platform?
+,,,,O,Outcomes,What outcomes must be achieved in the next 6–12 months?
+,,,,A,Actors,"Which teams, services, or domains are involved?"
+,,,,L,Limits,"What limits exist (budget, regulation, legacy systems)?"
+Executive / Architect,Requirements,Clarify Constraints,SAFE,S,Security,What security or compliance requirements exist?
+,,,,A,Availability,What uptime and reliability expectations exist?
+,,,,F,Functionality,What core capabilities must the system support?
+,,,,E,Efficiency,What performance or scale requirements exist?
+Architect,System Design,High-Level Architecture,FLOW,F,From,From which sources does the data originate?
+,,,,L,Load,How will data be loaded or ingested?
+,,,,O,Organize,How will the platform organize data and compute?
+,,,,W,Workloads,What workloads will consume the platform?
+Architect / Engineering,Implementation,Implement,DATA,D,Data Pipelines,How will pipelines ingest and process data?
+,,,,A,Analytics,How will analytics and BI models be structured?
+,,,,T,Training,How will ML models be trained and deployed?
+,,,,A,Applications,What AI or application workloads will run?
+Architect,Architecture Reasoning,Tradeoffs,FAST,F,Flexibility,How flexible should the architecture be?
+,,,,A,Accuracy,Are we optimizing for accuracy or speed?
+,,,,S,Simplicity,Can we simplify the architecture to reduce complexity?
+,,,,T,Time,What latency requirements exist?
+Engineering,Operations,Ensure,RUN,R,Reliability,How will the system remain reliable and fault tolerant?
+,,,,U,Understanding,How will we monitor and observe system behavior?
+,,,,N,Network,How will networking and security boundaries be enforced?
+Executive / Business,Success Metrics,Confirm,WIN,W,Workflow,Will this improve operational workflows?
+,,,,I,Insight,Will the platform deliver faster insights?
+,,,,N,New capabilities,"Will this enable ML, AI, automation, or new products?"
+Executive,Executive Communication,Tell,STORY,S,Strategy,What architecture strategy are we recommending?
+,,,,T,Technology,What technology or platform enables the strategy?
+,,,,O,Outcome,What measurable outcomes will the business see?
+,,,,R,Return,What ROI or business return will this generate?
+,,,,Y,Years,How does this support long-term strategy?

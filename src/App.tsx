@@ -1,14 +1,20 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import React, { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { jsPDF } from "jspdf";
-import { Activity, ArrowRight, Bot, ClipboardCopy, FileOutput, FolderOpen, Maximize2, Minimize2, Moon, PanelLeftClose, PanelLeftOpen, Save, Search, Sparkles, SunMedium } from "lucide-react";
+import { Activity, ArrowRight, Bot, ClipboardCopy, Code2, FileOutput, FolderOpen, Maximize2, Minimize2, Moon, PanelLeftClose, PanelLeftOpen, Plus, Save, Search, Sparkles, SunMedium, FileText } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { DesignCanvas } from "./components/DesignCanvas";
+import { DiscoveryPanel } from "./components/DiscoveryPanel";
+import { StoryTab } from "./components/StoryTab";
+import { JsonEditorModal } from "./components/JsonEditorModal";
+import { NewScenarioWizard } from "./components/NewScenarioWizard";
 import { normalizeArchitecture, starterArchitecture } from "./lib/architecture";
+import { ARCHITECT_TABS } from "./lib/architectFramework";
 import { getGroupedIcons, getIconById, iconCatalog } from "./lib/iconCatalog";
 import { sampleArchitecture, samplePlaybook, starterScenarioCatalog, starterScenarioInput, starterScenarios } from "./lib/mockData";
 import { staticScenarioLibrary } from "./lib/scenarioLibrary";
 import type { ArchitectureSpec, ChatMessage, IconDefinition, SavedScenario, ScenarioInput, ScenarioPlaybook, WorkspaceTab } from "./types/architecture";
+import type { ArchitectAnswers, StoryOutput } from "./types/architect";
 
 const storageKey = "solution-architect-scenario-studio";
 
@@ -25,23 +31,10 @@ const loadingSteps = [
   "Preparing mock interview..."
 ];
 
-const scenarioSections = [
-  "Overview",
-  "Discovery",
-  "Problem Framing",
-  "Architecture",
-  "Meeting Prep",
-  "Customer Questions",
-  "Risks and Failure Modes",
-  "Deliverables",
-  "Executive Summary",
-  "SA Toolkit"
-] as const;
-
-const workspaceTabs: WorkspaceTab[] = ["Overview", "solution", "design", ...scenarioSections.filter((item) => item !== "Overview")];
+const workspaceTabs: WorkspaceTab[] = ["Scenario", "Discovery", "Design", "Solution", "Story"];
 
 const parseWorkspaceTab = (value: string | null): WorkspaceTab =>
-  workspaceTabs.includes((value ?? "") as WorkspaceTab) ? ((value ?? "Overview") as WorkspaceTab) : "Overview";
+  workspaceTabs.includes((value ?? "") as WorkspaceTab) ? ((value ?? "Scenario") as WorkspaceTab) : "Scenario";
 
 const readInitialUrlState = () => {
   const params = new URLSearchParams(window.location.search);
@@ -120,6 +113,11 @@ function App() {
   const [toolboxExpandAll, setToolboxExpandAll] = useState(initialUrlState.servicesExpanded);
   const [compactDesignNodes, setCompactDesignNodes] = useState(initialUrlState.compact);
   const [selectedStaticScenarioId, setSelectedStaticScenarioId] = useState(initialUrlState.scenario);
+  const [architectAnswers, setArchitectAnswers] = useState<ArchitectAnswers>({});
+  const [story, setStory] = useState<StoryOutput | null>(null);
+  const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [jsonEditorOpen, setJsonEditorOpen] = useState<"scenario" | "architecture" | null>(null);
+  const [newScenarioOpen, setNewScenarioOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -155,6 +153,8 @@ function App() {
     setArchitecture(normalizeArchitecture(selectedScenario.architecture));
     setPlaybook(selectedScenario.playbook);
     setSolutionNarrative(selectedScenario.architecture.solutionOverview);
+    setArchitectAnswers(selectedScenario.architectAnswers ?? {});
+    setStory(selectedScenario.story ?? null);
   }, [selectedStaticScenarioId]);
 
   useEffect(() => {
@@ -286,7 +286,7 @@ function App() {
       setSolutionNarrative(payload.architecture.solutionOverview);
       setPlaybook(payload.playbook);
       setMessages((current) => [...current, createMessage("assistant", payload.assistantMessage)]);
-      setWorkspaceTab("Overview");
+      setWorkspaceTab("Scenario");
       setChatDraft("");
       setChatOpen(false);
     } catch {
@@ -305,13 +305,17 @@ function App() {
       title: scenarioInput.scenarioTitle || playbook.scenarioTitle || "Untitled scenario",
       input: scenarioInput,
       architecture,
-      playbook: {
-        ...playbook,
-        scenarioTitle: scenarioInput.scenarioTitle || playbook.scenarioTitle
-      },
+      playbook: { ...playbook, scenarioTitle: scenarioInput.scenarioTitle || playbook.scenarioTitle },
+      architectAnswers,
+      story,
       updatedAt: new Date().toISOString()
     };
     setSavedScenarios((current) => [saved, ...current]);
+  };
+
+  const handleSaveNewScenario = (scenario: SavedScenario) => {
+    setSavedScenarios((current) => [scenario, ...current]);
+    loadScenario(scenario);
   };
 
   const duplicateScenario = () => {
@@ -333,11 +337,69 @@ function App() {
     setArchitecture(normalizeArchitecture(scenario.architecture));
     setPlaybook(scenario.playbook);
     setSolutionNarrative(scenario.architecture.solutionOverview);
-    setWorkspaceTab("Overview");
+    setArchitectAnswers(scenario.architectAnswers ?? {});
+    setStory(scenario.story ?? null);
+    setWorkspaceTab("Scenario");
   };
 
   const copyText = async (value: string) => {
     await navigator.clipboard.writeText(value);
+  };
+
+  const updateArchitectAnswer = (questionId: string, value: string) => {
+    setArchitectAnswers((current) => ({ ...current, [questionId]: value }));
+  };
+
+  const handleGenerateStory = async () => {
+    setIsGeneratingStory(true);
+    try {
+      const response = await fetch("/api/studio/generate-story", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: architectAnswers, scenarioInput, currentArchitecture: architecture })
+      });
+
+      if (response.ok) {
+        const payload = await response.json() as { story: StoryOutput };
+        setStory(payload.story);
+      } else {
+        setStory({
+          strategy: `A governed ${scenarioInput.industry || "enterprise"} data platform built on a lakehouse architecture, unifying sources through a medallion lifecycle and enabling analytics and AI.`,
+          technology: `The platform leverages cloud-native ingestion, a Delta Lake medallion architecture, centralized governance, and curated data products for BI, ML, and AI consumption.`,
+          outcome: `Faster analytics delivery, reduced platform sprawl, trusted data products, and a governed foundation for machine learning and AI use cases.`,
+          returnValue: `Reduced time to insight, lower operational costs through platform consolidation, and accelerated AI-readiness that creates new business value.`,
+          years: `This architecture scales across domains, supports growing data volumes, and provides the governed foundation needed for advanced AI and automation in the years ahead.`
+        });
+      }
+    } catch {
+      setStory({
+        strategy: `A governed lakehouse platform that unifies enterprise data, supports analytics and AI, and delivers trusted data products across the organization.`,
+        technology: `Cloud-native data platform with medallion architecture, centralized governance, and curated consumption layers for BI, ML, and AI.`,
+        outcome: `Improved analytics speed, trusted data products, reduced duplication, and an AI-ready governed foundation.`,
+        returnValue: `Platform consolidation reduces costs; governed data products accelerate decision-making and enable new AI-driven capabilities.`,
+        years: `Scalable, governed architecture that grows with the organization and supports future AI, automation, and cross-domain data sharing.`
+      });
+    } finally {
+      setIsGeneratingStory(false);
+    }
+  };
+
+  const handleSaveScenarioJson = (parsed: unknown) => {
+    const data = parsed as { input?: typeof scenarioInput; playbook?: typeof playbook; architecture?: typeof architecture; architectAnswers?: ArchitectAnswers; story?: StoryOutput };
+    if (data.input) setScenarioInput(data.input);
+    if (data.playbook) setPlaybook(data.playbook);
+    if (data.architecture) {
+      setArchitecture(normalizeArchitecture(data.architecture));
+      setSolutionNarrative(data.architecture.solutionOverview || solutionNarrative);
+    }
+    if (data.architectAnswers) setArchitectAnswers(data.architectAnswers);
+    if (data.story !== undefined) setStory(data.story);
+  };
+
+  const handleSaveArchitectureJson = (parsed: unknown) => {
+    const arch = normalizeArchitecture(parsed as typeof architecture);
+    setArchitecture(arch);
+    setSolutionNarrative(arch.solutionOverview || solutionNarrative);
   };
 
   const exportExecutiveSummary = () => {
@@ -359,6 +421,39 @@ function App() {
     anchor.download = "executive-summary.txt";
     anchor.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportAssessmentPdf = () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = 500;
+    let y = 48;
+
+    const addLine = (text: string, fontSize = 11, isBold = false) => {
+      doc.setFontSize(fontSize);
+      doc.setFont("helvetica", isBold ? "bold" : "normal");
+      const lines = doc.splitTextToSize(text, pageWidth);
+      doc.text(lines, 48, y);
+      y += 16 * lines.length;
+      if (y > 760) { doc.addPage(); y = 48; }
+    };
+
+    addLine("Discovery Assessment", 18, true);
+    addLine(scenarioInput.scenarioTitle || "Untitled Scenario", 13, false);
+    y += 12;
+
+    ARCHITECT_TABS.forEach((tab) => {
+      y += 8;
+      addLine(`${tab.id} — ${tab.description}`, 13, true);
+      y += 4;
+      tab.questions.forEach((q) => {
+        addLine(q.question, 10, true);
+        const answer = architectAnswers[q.id]?.trim() || "(no response)";
+        addLine(answer, 10, false);
+        y += 4;
+      });
+    });
+
+    doc.save(`${(scenarioInput.scenarioTitle || "assessment").replace(/\s+/g, "-").toLowerCase()}-assessment.pdf`);
   };
 
   const exportPlaybookPdf = () => {
@@ -392,226 +487,168 @@ function App() {
     doc.save("scenario-playbook.pdf");
   };
 
-  const renderScenarioSection = (section: Exclude<WorkspaceTab, "design" | "solution">) => {
-    switch (section) {
-      case "Overview":
-        return (
-          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <SectionCard title="Customer Situation Summary" actionLabel="Copy" onAction={() => copyText(playbook.scenarioSummary)}>
-              <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{playbook.scenarioSummary}</p>
-              <div className="grid gap-3 md:grid-cols-2">
-                <MetricPill title="Confidence" value={`${playbook.confidenceRating}%`} />
-                <MetricPill title="Recommended path" value={`${playbook.recommendedConversationPath.length} steps`} />
+  const renderScenarioSection = () => {
+    return (
+          <div className="flex h-full min-h-0 w-full flex-col">
+            {/* Scenario title — large, prominent */}
+            <div className="border-b border-white/10 px-6 py-5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-300">Scenario</p>
+              <input
+                value={scenarioInput.scenarioTitle}
+                onChange={(e) => updateScenarioField("scenarioTitle", e.target.value)}
+                placeholder="Enter scenario title..."
+                className="mt-1 w-full bg-transparent text-2xl font-bold text-white outline-none placeholder:text-slate-600"
+              />
+              <div className="mt-3 flex flex-wrap gap-3">
+                <label className="flex items-center gap-2 text-xs text-slate-500">
+                  <span className="uppercase tracking-[0.18em]">Industry</span>
+                  <select
+                    value={scenarioInput.industry}
+                    onChange={(e) => updateScenarioField("industry", e.target.value)}
+                    className="rounded-lg border border-white/10 bg-slate-900 px-2.5 py-1 text-xs text-slate-200 outline-none focus:border-cyan-500/50"
+                  >
+                    <option value="">Select industry</option>
+                    {["Healthcare","Financial Services","Retail & E-commerce","Manufacturing","Energy & Utilities","Technology","Media & Entertainment","Government","Life Sciences / Pharma","Transportation & Logistics","Education","Telecommunications"].map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-500">
+                  <span className="uppercase tracking-[0.18em]">Customer type</span>
+                  <select
+                    value={scenarioInput.customerType}
+                    onChange={(e) => updateScenarioField("customerType", e.target.value)}
+                    className="rounded-lg border border-white/10 bg-slate-900 px-2.5 py-1 text-xs text-slate-200 outline-none focus:border-cyan-500/50"
+                  >
+                    <option value="">Select type</option>
+                    {["Enterprise","Mid-Market","Startup / ISV","Provider","Payer","Government Agency","Financial Institution","Retailer","Manufacturer","University / Research","Other"].map((v) => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-500">
+                  <span className="uppercase tracking-[0.18em]">Stakeholders</span>
+                  <input
+                    value={scenarioInput.stakeholders}
+                    onChange={(e) => updateScenarioField("stakeholders", e.target.value)}
+                    placeholder="e.g. CIO, VP Analytics"
+                    className="min-w-[220px] rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-cyan-500/50"
+                  />
+                </label>
               </div>
-            </SectionCard>
-            <SectionCard title="Business Drivers">
-              <BulletList items={playbook.businessDrivers} />
-            </SectionCard>
-            <SectionCard title="Key Constraints">
-              <BulletList items={playbook.constraints} />
-            </SectionCard>
-            <SectionCard title="Recommended Engagement Approach">
-              <BulletList items={playbook.recommendedEngagementApproach} />
-            </SectionCard>
-          </div>
-        );
-      case "Discovery":
-        return (
-          <div className="grid gap-4">
-            {playbook.discoveryQuestions.map((question) => (
-              <SectionCard key={question.question} title={question.category}>
-                <div className="space-y-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                  <p className="font-semibold text-slate-900 dark:text-white">{question.question}</p>
-                  <p><span className="font-medium text-slate-900 dark:text-white">Why it matters:</span> {question.whyItMatters}</p>
-                  <p><span className="font-medium text-emerald-700 dark:text-emerald-300">Good signal:</span> {question.goodSignal}</p>
-                  <p><span className="font-medium text-rose-700 dark:text-rose-300">Red flag:</span> {question.redFlag}</p>
-                </div>
-              </SectionCard>
-            ))}
-          </div>
-        );
-      case "Problem Framing":
-        return (
-          <div className="grid gap-4 xl:grid-cols-2">
-            <SectionCard title="Problem Statement">
-              <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{playbook.problemFraming.statement}</p>
-              <div className="rounded-2xl bg-slate-100/80 p-4 text-sm font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                {playbook.problemFraming.framingStatement}
-              </div>
-            </SectionCard>
-            <SectionCard title="Desired Outcomes">
-              <BulletList items={playbook.problemFraming.desiredOutcomes} />
-            </SectionCard>
-            <SectionCard title="Assumptions">
-              <BulletList items={playbook.problemFraming.assumptions} />
-            </SectionCard>
-            <SectionCard title="Non-negotiables">
-              <BulletList items={playbook.problemFraming.nonNegotiables} />
-            </SectionCard>
-          </div>
-        );
-      case "Architecture":
-        return (
-          <div className="grid gap-4">
-            {playbook.architectureOptions.map((option) => (
-              <SectionCard key={option.name} title={option.name} eyebrow={option.idealMaturityLevel}>
-                <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{option.summary}</p>
-                <div className="grid gap-2 xl:grid-cols-2">
-                  <CompactList title="When to use" items={option.whenToUse.slice(0, 3)} compact />
-                  <CompactList title="Benefits" items={option.benefits.slice(0, 3)} compact />
-                  <CompactList title="Tradeoffs" items={option.tradeoffs.slice(0, 3)} compact />
-                  <CompactList title="Platform mapping" items={option.platformMapping.slice(0, 4)} compact />
-                </div>
-                <SectionSubheader label="Whiteboard talk track" />
-                <BulletList items={option.talkTrack} />
-              </SectionCard>
-            ))}
-          </div>
-        );
-      case "Meeting Prep":
-        return (
-          <SectionCard title="Meeting Rehearsal">
-            <div className="space-y-4">
-              {Array.from({ length: Math.ceil(playbook.mockInterview.length / 2) }).map((_, pairIndex) => {
-                const prompt = playbook.mockInterview[pairIndex * 2];
-                const response = playbook.mockInterview[pairIndex * 2 + 1];
-                return (
-                  <article key={`prep-${pairIndex}`} className="rounded-[24px] border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-slate-900/60">
-                    {prompt ? (
-                      <div className="rounded-2xl bg-slate-100 p-4 text-sm leading-6 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">{prompt.speaker}</p>
-                        <p>{prompt.text}</p>
-                      </div>
-                    ) : null}
-                    {response ? (
-                      <div className="mt-3 rounded-2xl bg-cyan-500/10 p-4 text-sm leading-6 text-cyan-950 dark:text-cyan-100">
-                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-700 dark:text-cyan-300">{response.speaker}</p>
-                        <p>{response.text}</p>
-                      </div>
-                    ) : null}
-                  </article>
-                );
-              })}
             </div>
-          </SectionCard>
-        );
-      case "Customer Questions":
-        return (
-          <div className="grid gap-4">
-            {playbook.customerQuestions.map((question) => (
-              <SectionCard key={question.question} title="Customer Question">
-                <div className="rounded-2xl bg-slate-100 p-4 dark:bg-slate-800">
-                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Question</p>
-                  <p className="text-sm font-semibold leading-6 text-slate-900 dark:text-white">{question.question}</p>
-                </div>
-                <div className="rounded-2xl bg-cyan-500/10 p-4">
-                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-700 dark:text-cyan-300">Best response</p>
-                  <p className="text-sm leading-6 text-slate-700 dark:text-slate-200">{question.bestAnswer}</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600 dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-300">
-                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Response guidance</p>
-                  <p>{question.notes}</p>
-                </div>
-                {question.weakAnswer ? <ComparisonRow label="Weak answer" value={question.weakAnswer} tone="weak" /> : null}
-                {question.strongAnswer ? <ComparisonRow label="Strong answer" value={question.strongAnswer} tone="strong" /> : null}
-              </SectionCard>
-            ))}
-          </div>
-        );
-      case "Risks and Failure Modes":
-        return (
-          <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-            <SectionCard title="Risk Register">
-              <div className="space-y-3">
-                {playbook.risks.map((risk) => (
-                  <div key={risk.title} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-slate-900/60">
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <h4 className="text-sm font-semibold text-slate-900 dark:text-white">{risk.title}</h4>
-                      <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-700 dark:text-amber-300">
-                        {risk.likelihood} / {risk.impact}
-                      </span>
-                    </div>
-                    <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{risk.description}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300"><span className="font-medium text-slate-900 dark:text-white">Mitigation:</span> {risk.mitigation}</p>
+
+            {/* Main scenario body — big, editable */}
+            <div className="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-2">
+              <div className="flex flex-col border-r border-white/10 p-6">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Scenario / Use Case</p>
+                <textarea
+                  value={scenarioInput.problemStatement}
+                  onChange={(e) => updateScenarioField("problemStatement", e.target.value)}
+                  placeholder="Describe the customer scenario and use case in detail. What is the organization trying to solve? What triggered this initiative? Who is involved and what do they need?"
+                  className="min-h-0 flex-1 resize-none bg-transparent text-base leading-8 text-slate-100 outline-none placeholder:text-slate-700"
+                />
+              </div>
+              <div className="flex min-h-0 flex-col overflow-y-auto p-6">
+                <div className="space-y-4">
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Business Goals</p>
+                    <textarea
+                      value={scenarioInput.businessGoals}
+                      onChange={(e) => updateScenarioField("businessGoals", e.target.value)}
+                      placeholder="What are the top business goals driving this initiative?"
+                      rows={3}
+                      className="w-full resize-y rounded-[14px] border border-white/10 bg-white/5 p-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500/40"
+                    />
                   </div>
-                ))}
-              </div>
-            </SectionCard>
-            <SectionCard title="Risk Heat">
-              <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={riskChart}>
-                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.18} />
-                    <XAxis dataKey="name" hide />
-                    <YAxis domain={[0, 3]} />
-                    <Tooltip />
-                    <Bar dataKey="likelihood" fill="#f97316" radius={8} />
-                    <Bar dataKey="impact" fill="#0ea5e9" radius={8} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </SectionCard>
-          </div>
-        );
-      case "Deliverables":
-        return (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {playbook.deliverables.map((deliverable) => (
-              <SectionCard key={deliverable.name} title={deliverable.name}>
-                <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{deliverable.purpose}</p>
-                <CompactList title="Sample outline" items={deliverable.outline.slice(0, 4)} compact />
-              </SectionCard>
-            ))}
-          </div>
-        );
-      case "Executive Summary":
-        return (
-          <div className="grid gap-4 xl:grid-cols-2">
-            <SectionCard title="Sponsor-ready Summary" actionLabel="Export" onAction={exportExecutiveSummary}>
-              <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{playbook.executiveSummary.sponsorReady}</p>
-            </SectionCard>
-            <SectionCard title="30-second Version">
-              <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{playbook.executiveSummary.thirtySecond}</p>
-            </SectionCard>
-            <SectionCard title="2-minute Version">
-              <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{playbook.executiveSummary.twoMinute}</p>
-            </SectionCard>
-            <SectionCard title="What Success Looks Like in 12 Months">
-              <BulletList items={playbook.executiveSummary.successIn12Months} />
-            </SectionCard>
-          </div>
-        );
-      case "SA Toolkit":
-        return (
-          <div className="grid gap-4 xl:grid-cols-2">
-            <SectionCard title="Meeting Checklist">
-              <BulletList items={playbook.meetingChecklist} />
-            </SectionCard>
-            <SectionCard title="Next Steps">
-              <BulletList items={playbook.nextSteps} />
-            </SectionCard>
-            <SectionCard title="Workshop Plan">
-              <BulletList items={playbook.workshopPlan} />
-            </SectionCard>
-            <SectionCard title="Objection Handling">
-              <div className="space-y-3">
-                {playbook.objections.map((objection) => (
-                  <div key={objection.objection} className="rounded-2xl bg-slate-100/80 p-4 text-sm dark:bg-slate-800/80">
-                    <p className="font-semibold text-slate-900 dark:text-white">{objection.objection}</p>
-                    <p className="mt-2 leading-6 text-slate-600 dark:text-slate-300">{objection.response}</p>
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Current State</p>
+                    <textarea
+                      value={scenarioInput.currentState}
+                      onChange={(e) => updateScenarioField("currentState", e.target.value)}
+                      placeholder="What does the current environment look like? Systems, pain points, fragmentation..."
+                      rows={3}
+                      className="w-full resize-y rounded-[14px] border border-white/10 bg-white/5 p-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500/40"
+                    />
                   </div>
-                ))}
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Desired Future State</p>
+                    <textarea
+                      value={scenarioInput.desiredFutureState}
+                      onChange={(e) => updateScenarioField("desiredFutureState", e.target.value)}
+                      placeholder="What should the future look like? What capabilities does the organization want to have?"
+                      rows={3}
+                      className="w-full resize-y rounded-[14px] border border-white/10 bg-white/5 p-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500/40"
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Constraints &amp; Compliance</p>
+                    <textarea
+                      value={scenarioInput.constraints}
+                      onChange={(e) => updateScenarioField("constraints", e.target.value)}
+                      placeholder="Budget, timeline, compliance requirements, legacy system constraints..."
+                      rows={3}
+                      className="w-full resize-y rounded-[14px] border border-white/10 bg-white/5 p-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500/40"
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Timeline</p>
+                    <input
+                      value={scenarioInput.timeline}
+                      onChange={(e) => updateScenarioField("timeline", e.target.value)}
+                      placeholder="e.g. 12 months for measurable value"
+                      className="w-full rounded-[14px] border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500/40"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setChatOpen(true); setChatDraft(scenarioInput.problemStatement || scenarioInput.scenarioTitle); }}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-cyan-500/15 py-3 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-500/25"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Generate playbook from this scenario
+                  </button>
+                </div>
               </div>
-            </SectionCard>
+            </div>
           </div>
         );
-      default:
-        return null;
-    }
   };
 
   const renderWorkspaceContent = () => {
-    if (workspaceTab === "design") {
+    if (workspaceTab === "Discovery") {
+      return (
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <DiscoveryPanel
+            answers={architectAnswers}
+            onAnswerChange={updateArchitectAnswer}
+          />
+        </div>
+      );
+    }
+
+    if (workspaceTab === "Story") {
+      return (
+        <div className="flex min-h-0 min-w-0 flex-col items-stretch overflow-y-auto p-6">
+          <StoryTab
+            story={story}
+            answers={architectAnswers}
+            onGenerate={handleGenerateStory}
+            isGenerating={isGeneratingStory}
+          />
+        </div>
+      );
+    }
+
+    if (workspaceTab === "Scenario") {
+      return (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {renderScenarioSection()}
+        </div>
+      );
+    }
+
+    if (workspaceTab === "Design") {
       return (
         <div
           className="grid h-full min-h-0 min-w-0 gap-2 overflow-hidden p-2"
@@ -636,19 +673,19 @@ function App() {
           }}
         >
           <aside
-            className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-slate-200/90 bg-white/94 shadow-[0_18px_42px_rgba(15,23,42,0.14)] backdrop-blur-xl"
+            className="flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-white/10 bg-slate-900/95 shadow-[0_18px_42px_rgba(2,6,23,0.3)] backdrop-blur-xl"
           >
             <div className={`flex items-center ${toolboxOpen ? "justify-between gap-2 px-2 py-2" : "justify-center px-1.5 py-2"}`}>
               {toolboxOpen ? (
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-700">Services</p>
-                  <p className="text-[10px] text-slate-500">Drag or click to add</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-300">Services</p>
+                  <p className="text-[10px] text-slate-400">Drag or click to add</p>
                 </div>
               ) : null}
               <button
                 type="button"
                 onClick={() => setToolboxOpen((current) => !current)}
-                className="rounded-full bg-slate-100 p-1.5 text-slate-700"
+                className="rounded-full bg-white/10 p-1.5 text-slate-200"
                 title={toolboxOpen ? "Collapse services" : "Expand services"}
               >
                 {toolboxOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
@@ -657,34 +694,34 @@ function App() {
             {toolboxOpen ? (
               <div className="flex min-h-0 flex-1 flex-col gap-2 px-2 pb-2">
               <div className="flex items-center gap-2">
-                <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-slate-100 px-2.5 py-2">
+                <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-white/10 px-2.5 py-2">
                   <Search className="h-3.5 w-3.5 text-slate-400" />
                   <input
                     value={toolboxQuery}
                     onChange={(event) => setToolboxQuery(event.target.value)}
                     placeholder="Search"
-                    className="w-full bg-transparent text-xs text-slate-700 outline-none"
+                    className="w-full bg-transparent text-xs text-slate-200 outline-none placeholder:text-slate-500"
                   />
                 </label>
                 <button
                   type="button"
                   onClick={() => setToolboxExpandAll((current) => !current)}
-                  className="rounded-full bg-slate-100 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600"
+                  className="rounded-full bg-white/10 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400"
                 >
                   {toolboxExpandAll ? "Collapse" : "Expand all"}
                 </button>
               </div>
               <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                 {Object.entries(filteredIcons).map(([vendor, categories]) => (
-                  <details key={`${vendor}-${toolboxExpandAll ? "all" : "compact"}`} open={toolboxExpandAll} className="text-slate-900">
-                    <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.16em]">
+                  <details key={`${vendor}-${toolboxExpandAll ? "all" : "compact"}`} open={toolboxExpandAll} className="text-white">
+                    <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
                       {vendor}
                     </summary>
                     <div className="mt-2 space-y-2">
                       {Object.entries(categories).map(([category, icons]) => (
                         <details key={`${vendor}-${category}-${toolboxExpandAll ? "all" : "compact"}`} open={toolboxExpandAll}>
-                          <summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            {category} <span className="text-slate-400">({icons.length})</span>
+                          <summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                            {category} <span className="text-slate-500">({icons.length})</span>
                           </summary>
                           <div className="mt-1.5 grid gap-0.5">
                             {icons.map((icon) => (
@@ -698,12 +735,12 @@ function App() {
                                   event.dataTransfer.setData("text/plain", icon.id);
                                   event.dataTransfer.effectAllowed = "copy";
                                 }}
-                                className="grid cursor-grab grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-lg px-1 py-1.5 text-left transition hover:bg-slate-100 active:cursor-grabbing"
+                                className="grid cursor-grab grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-lg px-1 py-1.5 text-left transition hover:bg-white/10 active:cursor-grabbing"
                               >
                                 <img className="h-5 w-5 object-contain" src={icon.assetPath} alt={icon.label} />
                                 <div className="min-w-0">
-                                  <p className="truncate text-[11px] font-semibold text-slate-900">{icon.service}</p>
-                                  <p className="truncate text-[10px] text-slate-500">{icon.label}</p>
+                                  <p className="truncate text-[11px] font-semibold text-white">{icon.service}</p>
+                                  <p className="truncate text-[10px] text-slate-400">{icon.label}</p>
                                 </div>
                               </button>
                             ))}
@@ -729,7 +766,7 @@ function App() {
                       event.dataTransfer.setData("text/plain", icon.id);
                       event.dataTransfer.effectAllowed = "copy";
                     }}
-                    className="flex cursor-grab items-center justify-center rounded-lg p-1.5 hover:bg-slate-100 active:cursor-grabbing"
+                    className="flex cursor-grab items-center justify-center rounded-lg p-1.5 hover:bg-white/10 active:cursor-grabbing"
                     title={icon.service}
                   >
                     <img className="h-5 w-5 object-contain" src={icon.assetPath} alt={icon.label} />
@@ -754,7 +791,7 @@ function App() {
       );
     }
 
-    if (workspaceTab === "solution") {
+    if (workspaceTab === "Solution") {
       return (
         <div className="grid min-h-0 min-w-0 gap-3 overflow-hidden p-3 xl:grid-cols-[1.15fr_0.85fr]">
           <section className="min-h-0 overflow-y-auto rounded-[24px] border border-white/10 bg-white/8 p-4">
@@ -818,11 +855,7 @@ function App() {
       );
     }
 
-      return (
-      <div className="flex min-h-0 min-w-0 flex-col items-stretch justify-start overflow-y-auto p-3">
-        {renderScenarioSection(workspaceTab)}
-      </div>
-    );
+    return null;
   };
 
   return (
@@ -830,12 +863,9 @@ function App() {
       <div className="mx-auto flex h-full max-w-[1780px] flex-col px-3 pb-3 pt-2 md:px-4">
         <header className="sticky top-2 z-40 flex items-center justify-between gap-3 rounded-[18px] border border-white/10 bg-slate-950/72 px-3 py-1.5 shadow-[0_16px_32px_rgba(2,6,23,0.34)] backdrop-blur-xl">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.35em] text-cyan-300">
+            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.35em] text-cyan-300">
               <Sparkles className="h-3.5 w-3.5" />
               SA Assistant
-            </div>
-            <div className="mt-0.5 flex items-center gap-3">
-              <h1 className="truncate text-[14px] font-semibold text-white">Architecture design, discovery, and meeting-ready delivery</h1>
             </div>
           </div>
           <div className="flex min-w-0 shrink-0 items-center gap-2">
@@ -853,9 +883,14 @@ function App() {
                 ))}
               </select>
             </label>
-            <div className="hidden rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-slate-300 xl:block">
-              {loading ? loadingStep : "Mock + OpenAI modes available"}
-            </div>
+            <button
+              type="button"
+              onClick={() => setNewScenarioOpen(true)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10"
+              title="Create new scenario"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
             <button
               type="button"
               onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
@@ -886,15 +921,18 @@ function App() {
                     key={value}
                     type="button"
                     onClick={() => setWorkspaceTab(value)}
-                    className={`whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] font-semibold transition ${workspaceTab === value ? "bg-white text-slate-950" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}
+                    className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${workspaceTab === value ? "bg-white text-slate-950" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}
                   >
-                    {value === "design" ? "Design" : value === "solution" ? "Solution" : value}
+                    {value}
                   </button>
                 ))}
               </div>
               <div className="flex min-h-[28px] shrink-0 items-center gap-1.5">
                 <ActionButton icon={<Save className="h-3.5 w-3.5" />} label="Save" onClick={saveScenario} compact />
+                <ActionButton icon={<FileText className="h-3.5 w-3.5" />} label="Export Assessment" onClick={exportAssessmentPdf} compact />
                 <ActionButton icon={<FileOutput className="h-3.5 w-3.5" />} label="PDF" onClick={exportPlaybookPdf} compact />
+                <ActionButton icon={<Code2 className="h-3.5 w-3.5" />} label="Scenario JSON" onClick={() => setJsonEditorOpen("scenario")} compact />
+                <ActionButton icon={<Code2 className="h-3.5 w-3.5" />} label="Arch JSON" onClick={() => setJsonEditorOpen("architecture")} compact />
                 <button
                   type="button"
                   onClick={() => setWorkspaceFullscreen((current) => !current)}
@@ -1056,6 +1094,28 @@ function App() {
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      <JsonEditorModal
+        title="Scenario JSON"
+        subtitle="Edit the full scenario including input, playbook, and ARCHITECT answers"
+        value={{ input: scenarioInput, playbook, architecture, architectAnswers, story }}
+        open={jsonEditorOpen === "scenario"}
+        onSave={handleSaveScenarioJson}
+        onClose={() => setJsonEditorOpen(null)}
+      />
+      <JsonEditorModal
+        title="Architecture JSON"
+        subtitle="Edit nodes and edges of the architecture diagram"
+        value={architecture}
+        open={jsonEditorOpen === "architecture"}
+        onSave={handleSaveArchitectureJson}
+        onClose={() => setJsonEditorOpen(null)}
+      />
+      <NewScenarioWizard
+        open={newScenarioOpen}
+        onClose={() => setNewScenarioOpen(false)}
+        onSave={handleSaveNewScenario}
+      />
     </div>
   );
 }

@@ -3,6 +3,72 @@ import type { ArchitectureSpec, SavedScenario, ScenarioInput, ScenarioPlaybook }
 import { normalizeArchitecture } from "./architecture";
 import { sampleArchitecture, samplePlaybook, starterScenarioInput } from "./mockData";
 
+const deriveAnswersFromParams = (params: {
+  input: ScenarioInput;
+  businessDrivers: string[];
+  constraints: string[];
+  solutionOverview: string;
+  whiteboardTalkTrack: string[];
+  discoveryQuestions: ScenarioPlaybook["discoveryQuestions"];
+  risks: ScenarioPlaybook["risks"];
+  deliverables: ScenarioPlaybook["deliverables"];
+}): Record<string, string> => {
+  const { input, businessDrivers, constraints, solutionOverview, whiteboardTalkTrack, risks } = params;
+  return {
+    why_w1: businessDrivers.slice(0, 2).join(". "),
+    why_w2: input.problemStatement,
+    why_w3: input.businessGoals,
+    why_h1: input.stakeholders,
+    why_h2: input.stakeholders,
+    why_h3: "Analytics teams, data engineers, data scientists, operational leaders, and executive sponsors",
+    why_y1: solutionOverview,
+    why_y2: businessDrivers.join(". "),
+    why_y3: businessDrivers.join(". "),
+    goal_g1: solutionOverview,
+    goal_g2: businessDrivers[0] || "",
+    goal_o1: businessDrivers.slice(2).join(". "),
+    goal_o2: `Measurable progress on ${businessDrivers.slice(0, 2).join(" and ")} within 6 to 12 months`,
+    goal_a1: input.stakeholders,
+    goal_a2: "Central data platform team, domain data owners, governance committee, and business sponsors",
+    goal_l1: constraints.join(". "),
+    goal_l2: `Timeline: ${input.timeline}. Constraints include ${input.constraints}`,
+    safe_s1: `Compliance requirements: ${input.compliance.join(", ")}. Access controls, audit trails, and data lineage are mandatory from day one.`,
+    safe_s2: input.compliance.length > 0 ? `Data includes ${input.compliance.join(", ")} regulated content. PHI and PII handling require strict governance.` : "Sensitive enterprise data requiring role-based access controls and audit logging.",
+    safe_a1: "High availability for operational and reporting workloads. Planned maintenance windows acceptable for batch analytics.",
+    safe_a2: "Operational reporting: near-zero RPO, 1-hour RTO. Batch analytics: 4-hour RTO acceptable.",
+    safe_f1: "Analytics, ML pipelines, streaming ingestion, BI dashboards, AI-ready curated data products",
+    safe_e1: "Enterprise scale with multi-domain ingestion. Compute auto-scaling required for concurrent analytics workloads.",
+    safe_e2: "Dashboard SLAs of sub-5-second query response. Batch pipelines sized for daily and incremental refresh patterns.",
+    flow_f1: input.currentState,
+    flow_l1: "Auto Loader for file ingestion, CDC for operational databases, streaming for event-driven feeds where latency justifies complexity",
+    flow_o1: "Bronze for raw ingestion and replayability. Silver for standardization, validation, and entity reconciliation. Gold for curated domain data products.",
+    flow_w1: whiteboardTalkTrack.join(". "),
+    data_d1: solutionOverview,
+    data_d2: "Schema evolution via Auto Loader inference. Data quality enforced at Silver with expectations and quarantine. Failed records logged for investigation.",
+    data_a1: "Dimensional models at Silver for consistency. Denormalized serving tables at Gold for dashboard performance.",
+    data_a2: "Gold uses denormalized aggregates optimized per consumer. Dimensional models support cross-domain joins at Silver.",
+    data_t1: "ML models trained on curated Gold datasets. MLflow for experiment tracking and model registry governance.",
+    data_t2: "Feature engineering at Silver/Gold with reusable feature pipelines. Feature store enables model team collaboration.",
+    data_a3: "AI assistants, recommendation engines, and decision-support tools consuming governed data products from Gold layer",
+    data_a4: "RAG-based knowledge assistants grounded in enterprise documents. Predictive models for operational optimization.",
+    fast_f1: "Platform designed for incremental domain expansion. New data products added without disrupting existing consumers.",
+    fast_f2: "Domain teams self-serve through governed catalog with delegated data product ownership.",
+    fast_a1: constraints.join(". "),
+    fast_a2: "Strict consistency for operational/financial reporting. Approximate analytics acceptable for exploratory use cases.",
+    fast_s1: "Architecture optimizes for operational simplicity over advanced features. Streaming reserved for high-value latency use cases.",
+    fast_t1: "Daily refresh for enterprise reporting. Near-real-time for select operational dashboards.",
+    fast_t2: "Batch for most analytics. Streaming only where business latency requirements justify the operational overhead.",
+    run_r1: risks.slice(0, 2).map((r) => `${r.title}: ${r.mitigation}`).join(". "),
+    run_r2: "Automated retry with exponential backoff. Checkpoint-based streaming recovery. Bronze replayability eliminates catastrophic data loss.",
+    run_u1: "Workflow metrics, job duration, throughput, and data quality dashboards. Lineage tracked in Unity Catalog.",
+    run_u2: "Alerts on SLA breaches, quality threshold violations, and schema drift. On-call escalation per workload tier.",
+    run_n1: "Unity Catalog row and column-level security. Private endpoints and VPC isolation. Identity-based access with MFA.",
+    win_w1: solutionOverview,
+    win_i1: businessDrivers.join(". "),
+    win_n1: input.desiredFutureState
+  };
+};
+
 const cleanLines = (value: string) =>
   value
     .split("\n")
@@ -383,6 +449,7 @@ const createScenarioFromBlock = ({
       workshopPlan,
       objections
     },
+    architectAnswers: deriveAnswersFromParams({ input, businessDrivers, constraints, solutionOverview, whiteboardTalkTrack, discoveryQuestions, risks, deliverables }),
     updatedAt: new Date("2026-03-13T10:10:00.000Z").toISOString()
   };
 };
@@ -544,6 +611,16 @@ const createHealthSystemScenario = (): SavedScenario => {
       ]
     ),
     playbook,
+    architectAnswers: deriveAnswersFromParams({
+      input,
+      businessDrivers: playbook.businessDrivers,
+      constraints: playbook.constraints,
+      solutionOverview: "A governed healthcare lakehouse unifies fragmented enterprise sources, supports selective real-time analytics, and creates a phased path toward AI-ready data products.",
+      whiteboardTalkTrack: playbook.whiteboardTalkTrack,
+      discoveryQuestions: playbook.discoveryQuestions,
+      risks: playbook.risks,
+      deliverables: playbook.deliverables
+    }),
     updatedAt: new Date("2026-03-13T10:00:00.000Z").toISOString()
   };
 };
@@ -731,6 +808,16 @@ const createPharmaScenario = (): SavedScenario => {
     input,
     architecture,
     playbook,
+    architectAnswers: deriveAnswersFromParams({
+      input,
+      businessDrivers: playbook.businessDrivers,
+      constraints: playbook.constraints,
+      solutionOverview: "The platform unifies CRM, prescription, marketing, patient support, and medical content into a governed lakehouse with curated HCP-centric data products and AI-ready assets.",
+      whiteboardTalkTrack: playbook.whiteboardTalkTrack,
+      discoveryQuestions: playbook.discoveryQuestions,
+      risks: playbook.risks,
+      deliverables: playbook.deliverables
+    }),
     updatedAt: new Date("2026-03-13T10:05:00.000Z").toISOString()
   };
 };

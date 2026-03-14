@@ -1,5 +1,5 @@
-import { Download, MoveDiagonal2, Rows3, Text } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
+import { Download, Map as MapIcon, MoveDiagonal2, Rows3, Text } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   ConnectionMode,
@@ -50,7 +50,7 @@ const GROUP_PADDING_BOTTOM = 24;
 
 function CanvasNode({ data }: NodeProps<Node<CanvasNodeData>>) {
   return (
-    <div className={`relative rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_18px_36px_rgba(15,23,42,0.1)] ${data.compact ? "w-[184px]" : "w-[248px]"}`}>
+    <div className={`relative rounded-2xl border border-slate-200/60 bg-white text-slate-900 shadow-[0_18px_36px_rgba(15,23,42,0.1)] ${data.compact ? "w-[184px]" : "w-[248px]"}`}>
       {(["top", "right", "bottom", "left"] as const).map((side) => (
         <Handle
           key={`${side}-target`}
@@ -59,7 +59,7 @@ function CanvasNode({ data }: NodeProps<Node<CanvasNodeData>>) {
           position={
             side === "top" ? Position.Top : side === "right" ? Position.Right : side === "bottom" ? Position.Bottom : Position.Left
           }
-          className="!h-2.5 !w-2.5 !border-2 !border-white !bg-cyan-500"
+          className="!h-2.5 !w-2.5 !border-2 !border-white !bg-cyan-400/70"
         />
       ))}
       {(["top", "right", "bottom", "left"] as const).map((side) => (
@@ -70,7 +70,7 @@ function CanvasNode({ data }: NodeProps<Node<CanvasNodeData>>) {
           position={
             side === "top" ? Position.Top : side === "right" ? Position.Right : side === "bottom" ? Position.Bottom : Position.Left
           }
-          className="!h-2.5 !w-2.5 !border-2 !border-white !bg-slate-700"
+          className="!h-2.5 !w-2.5 !border-2 !border-white !bg-slate-400/70"
         />
       ))}
       <div className={`grid gap-3 p-3 ${data.compact ? "grid-cols-[36px_minmax(0,1fr)]" : "grid-cols-[44px_minmax(0,1fr)]"}`}>
@@ -92,6 +92,28 @@ function CanvasNode({ data }: NodeProps<Node<CanvasNodeData>>) {
 function CanvasGroup({ data }: NodeProps<Node<GroupNodeData>>) {
   return (
     <div className="h-full w-full rounded-[28px] border border-dashed border-cyan-300/80 bg-cyan-50/55">
+      {(["top", "right", "bottom", "left"] as const).map((side) => (
+        <Handle
+          key={`${side}-target`}
+          id={`${side}-target`}
+          type="target"
+          position={
+            side === "top" ? Position.Top : side === "right" ? Position.Right : side === "bottom" ? Position.Bottom : Position.Left
+          }
+          className="!h-2.5 !w-2.5 !border-2 !border-white !bg-cyan-400/70"
+        />
+      ))}
+      {(["top", "right", "bottom", "left"] as const).map((side) => (
+        <Handle
+          key={`${side}-source`}
+          id={`${side}-source`}
+          type="source"
+          position={
+            side === "top" ? Position.Top : side === "right" ? Position.Right : side === "bottom" ? Position.Bottom : Position.Left
+          }
+          className="!h-2.5 !w-2.5 !border-2 !border-white !bg-slate-400/70"
+        />
+      ))}
       <div className="px-4 py-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-700">{data.label}</p>
       </div>
@@ -196,8 +218,8 @@ const toFlowEdge = (architectureEdge: ArchitectureSpec["edges"][number]): Edge =
   label: architectureEdge.label,
   type: "smoothstep",
   animated: false,
-  style: { stroke: "#475569", strokeWidth: 1.8 },
-  labelStyle: { fill: "#0f172a", fontSize: 12 }
+  style: { stroke: "rgba(148,163,184,0.45)", strokeWidth: 1.5 },
+  labelStyle: { fill: "#94a3b8", fontSize: 11 }
 });
 
 export function DesignCanvas({
@@ -208,6 +230,7 @@ export function DesignCanvas({
   onAutoLayout
 }: DesignCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [minimapOpen, setMinimapOpen] = useState(true);
   const nonOverlappingNodes = useMemo(() => preventOverlap(architecture.nodes), [architecture.nodes]);
   const groupLayouts = useMemo(() => buildGroupLayouts(nonOverlappingNodes), [nonOverlappingNodes]);
   const flowNodes = useMemo(() => {
@@ -218,7 +241,7 @@ export function DesignCanvas({
       data: { label: group.label },
       style: { width: group.width, height: group.height, zIndex: 0 },
       draggable: true,
-      selectable: false
+      selectable: true
     }));
     const memberNodes = nonOverlappingNodes.map((node) => toFlowNode(node, compactNodes, groupLayouts));
     return [...groupNodes, ...memberNodes];
@@ -265,7 +288,9 @@ export function DesignCanvas({
         ...connection,
         id: `edge_${crypto.randomUUID()}`,
         type: "smoothstep",
-        label: "connects"
+        label: "connects",
+        style: { stroke: "rgba(148,163,184,0.45)", strokeWidth: 1.5 },
+        labelStyle: { fill: "#94a3b8", fontSize: 11 }
       },
       edges
     );
@@ -281,7 +306,16 @@ export function DesignCanvas({
     const dataUrl = await toPng(canvasRef.current, {
       cacheBust: true,
       backgroundColor: "#ffffff",
-      pixelRatio: 2
+      pixelRatio: 2,
+      filter: (node) => {
+        if (node instanceof HTMLElement) {
+          const cls = node.className;
+          if (typeof cls === "string" && (cls.includes("react-flow__minimap") || cls.includes("react-flow__controls"))) {
+            return false;
+          }
+        }
+        return true;
+      }
     });
 
     const anchor = document.createElement("a");
@@ -290,22 +324,24 @@ export function DesignCanvas({
     anchor.click();
   };
 
+  const displayTitle = architecture.title || "Visual workspace";
+
   return (
-    <section className="flex h-full min-h-[740px] flex-col overflow-hidden rounded-[26px] border border-white/10 bg-white shadow-[0_24px_72px_rgba(15,23,42,0.16)]">
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 text-slate-900">
+    <section className="flex h-full min-h-[740px] flex-col overflow-hidden rounded-[26px] border border-white/10 bg-slate-900 shadow-[0_24px_72px_rgba(2,6,23,0.35)]">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 text-white">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-700">Design Board</p>
-          <h2 className="text-sm font-semibold">Visual workspace</h2>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-300">Design Board</p>
+          <h2 className="max-w-[320px] truncate text-sm font-semibold" title={displayTitle}>{displayTitle}</h2>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 md:inline-flex">
+          <span className="hidden items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs text-slate-400 md:inline-flex">
             <MoveDiagonal2 className="h-3.5 w-3.5" />
             Drag, connect, and drop from toolbox
           </span>
           <button
             type="button"
             onClick={onToggleCompactNodes}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+            className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
             title={compactNodes ? "Show node descriptions" : "Hide node descriptions"}
           >
             {compactNodes ? <Text className="h-3.5 w-3.5" /> : <Rows3 className="h-3.5 w-3.5" />}
@@ -314,7 +350,7 @@ export function DesignCanvas({
           <button
             type="button"
             onClick={onAutoLayout}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+            className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
             title="Auto layout nodes by lane"
           >
             <MoveDiagonal2 className="h-3.5 w-3.5" />
@@ -322,8 +358,16 @@ export function DesignCanvas({
           </button>
           <button
             type="button"
+            onClick={() => setMinimapOpen((open) => !open)}
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition ${minimapOpen ? "bg-white/15 text-slate-200" : "bg-white/10 text-slate-200 hover:bg-white/15"}`}
+            title={minimapOpen ? "Hide minimap" : "Show minimap"}
+          >
+            <MapIcon className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
+            className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-cyan-400"
           >
             <Download className="h-3.5 w-3.5" />
             Export PNG
@@ -337,7 +381,11 @@ export function DesignCanvas({
           nodeTypes={nodeTypes}
           connectionMode={ConnectionMode.Loose}
           connectionLineType={ConnectionLineType.SmoothStep}
-          defaultEdgeOptions={{ type: "smoothstep" }}
+          defaultEdgeOptions={{
+            type: "smoothstep",
+            style: { stroke: "rgba(148,163,184,0.45)", strokeWidth: 1.5 },
+            labelStyle: { fill: "#94a3b8", fontSize: 11 }
+          }}
           nodesConnectable
           nodesDraggable
           elementsSelectable
@@ -351,9 +399,16 @@ export function DesignCanvas({
           fitView
           fitViewOptions={{ padding: 0.16 }}
         >
-          <MiniMap pannable zoomable nodeColor={() => "#0f172a"} className="!bg-slate-50" />
+          {minimapOpen && (
+            <MiniMap
+              pannable
+              zoomable
+              nodeColor={() => "#94a3b8"}
+              className="!bg-slate-50/90 !border !border-slate-200 !rounded-xl"
+            />
+          )}
           <Controls />
-          <Background gap={24} size={1.05} color="#dbe4ee" />
+          <Background gap={24} size={1.2} color="#dbe4ee" />
         </ReactFlow>
       </div>
     </section>

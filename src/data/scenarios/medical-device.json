@@ -1,0 +1,520 @@
+{
+  "id": "medical-device-static",
+  "title": "Medical Device Intelligence Platform",
+  "updatedAt": "2026-03-14T00:00:00.000Z",
+  "input": {
+    "scenarioTitle": "Medical Device Intelligence Platform",
+    "industry": "Life Sciences",
+    "customerType": "Medical Device",
+    "problemStatement": "A global medical device company cannot effectively monitor device performance, detect product safety signals, manage complaints, or comply with MDR/IVDR regulatory requirements because connected device telemetry, QMS complaint data, regulatory documentation, clinical performance data, and manufacturing records exist in completely siloed systems.",
+    "businessGoals": "Unify connected device telemetry, QMS/complaint/CAPA data, regulatory documents, clinical performance data, and manufacturing quality data into a Device Intelligence Platform that enables predictive maintenance, proactive safety signal detection, regulatory compliance automation, and AI-powered device lifecycle management.",
+    "constraints": "21 CFR Part 820 (QSR) and MDR 2017/745 compliance required, device telemetry data privacy varies by region (GDPR for EU devices), complaint data must support regulatory reporting timelines (MDR reporting within 15 days of knowledge of serious injury), and existing QMS system cannot be replaced.",
+    "timeline": "12 months for core platform and safety signal monitoring, 18 months for predictive maintenance AI",
+    "currentState": "Connected device telemetry streams to a separate IoT platform, complaint data lives in a QMS (Greenlight Guru), SOPs and regulatory documents are in a document management system, clinical performance data is in a clinical data warehouse, and manufacturing data is in a separate MES — no integration between any of these systems.",
+    "desiredFutureState": "A unified Databricks Lakehouse with Device 360 integrating all device lifecycle data, real-time safety signal monitoring, automated MDR reporting workflow support, predictive maintenance AI, and AI-powered regulatory document analysis.",
+    "stakeholders": "VP Quality and Regulatory, VP Clinical Affairs, VP Manufacturing, CDO, Chief Safety Officer, Field Service Engineering VP",
+    "compliance": ["21 CFR Part 820 (QSR)", "MDR 2017/745", "IVDR 2017/746", "ISO 13485", "21 CFR Part 11", "GDPR"],
+    "architecturePreference": "Medallion (Bronze/Silver/Gold) on Databricks Lakehouse",
+    "outputDepth": "Comprehensive"
+  },
+  "architecture": {
+    "title": "Medical Device Intelligence Platform Architecture",
+    "summary": "A regulated Databricks Lakehouse unifying connected device telemetry, QMS complaint data, regulatory documents, clinical performance data, and manufacturing records into a Device 360 that powers predictive maintenance AI, proactive safety signal detection, and automated regulatory compliance workflows.",
+    "solutionOverview": "Device data from connected IoT telemetry, QMS complaint systems, regulatory document management, clinical performance databases, and manufacturing execution systems flows into the Databricks Lakehouse via Auto Loader for batch ingestion and Delta Live Tables for real-time telemetry streaming. The Bronze layer preserves raw data with 21 CFR Part 11 compliant audit trails. The Silver layer builds the Device 360 entity — a unified record per device instance combining operational telemetry, complaint history, regulatory submissions, clinical performance indicators, and manufacturing quality records. The Gold layer materializes device intelligence products: safety signal tables, predictive maintenance risk scores, MDR reporting queues, and regulatory submission packages. Unity Catalog governs access with regulatory audit trails and document lineage tracking.",
+    "assumptions": [
+      "Connected devices have telemetry transmission capability (cellular, WiFi, or BLE gateway)",
+      "The existing QMS system (Greenlight Guru or similar) provides API or batch export access to complaint and CAPA records",
+      "Databricks will be deployed in a GxP-validated environment for complaint and regulatory data processing",
+      "The regulatory document management system can export documents in structured or semi-structured format",
+      "Manufacturing MES provides batch export of lot records, process parameters, and quality check results"
+    ],
+    "details": [
+      {
+        "title": "Device and Source Data",
+        "body": "Five data source categories: Connected Device Telemetry (IoT sensor data including operational parameters, error codes, usage metrics, and environmental conditions streamed via MQTT/HTTPS from deployed devices); QMS/Complaints/CAPA (complaint records, adverse event reports, CAPA investigations from the quality management system); Regulatory Documents/SOPs (device master records, 510(k)/PMA submissions, IFUs, design controls, and SOPs from the document management system); Clinical/Product Performance (post-market clinical follow-up data, clinical trial results, literature surveillance findings); and Manufacturing/MES/Quality (lot records, process parameters, in-process quality checks, and final acceptance testing data from the MES)."
+      },
+      {
+        "title": "Device 360 Silver Layer",
+        "body": "The Silver layer builds the Device 360 entity: each device instance has a unique device identifier (UDI) linked to its model/version genealogy. The Device 360 integrates: operational telemetry history (cumulative usage cycles, error pattern analysis, environmental stress exposure), complaint history (complaint reason codes, severity classification, resolution), CAPA linkages (CAPAs triggered by this device or this model family), regulatory filing status (current 510(k)/CE mark status, pending submissions), and manufacturing genealogy (lot number, process parameters, in-process test results)."
+      },
+      {
+        "title": "Safety Signal Detection",
+        "body": "The Gold layer implements statistical process control (SPC) methods on complaint and adverse event data across device models and production lots. Disproportionality analysis (PRR, ROR) identifies complaint patterns that are statistically elevated relative to historical baselines. Signal detection runs daily with 24-hour lag from complaint entry to signal evaluation. Suspected signals are routed to the regulatory affairs team via an automated MDR reporting queue."
+      },
+      {
+        "title": "Predictive Maintenance AI",
+        "body": "The predictive maintenance model is trained on historical telemetry data from devices that subsequently had field failures or required service, building a device health score that predicts service need 30-60 days in advance. The model runs daily on all active deployed devices, producing a prioritized service queue for the field service team. Proactive service interventions are tracked against the predicted vs actual failure rate to measure model performance."
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-devices",
+        "label": "Connected Devices / Telemetry",
+        "iconId": "source-connected-devices",
+        "vendor": "generic",
+        "notes": "IoT telemetry from deployed medical devices: operational parameters, error codes, usage cycles, environmental conditions — streamed via MQTT/HTTPS",
+        "x": 60,
+        "y": 80,
+        "metadata": { "group": "Device & Source Data" }
+      },
+      {
+        "id": "n-qms",
+        "label": "QMS / Complaints / CAPA",
+        "iconId": "source-qms",
+        "vendor": "generic",
+        "notes": "Complaint records, adverse event reports, and CAPA investigation data from the quality management system (Greenlight Guru, Veeva Vault QMS)",
+        "x": 60,
+        "y": 200,
+        "metadata": { "group": "Device & Source Data" }
+      },
+      {
+        "id": "n-regdocs",
+        "label": "Regulatory Docs / SOPs / Manuals",
+        "iconId": "source-regulatory-docs",
+        "vendor": "generic",
+        "notes": "Device master records, 510(k)/PMA/CE mark submissions, IFUs, design controls, SOPs, and technical files from the document management system",
+        "x": 60,
+        "y": 320,
+        "metadata": { "group": "Device & Source Data" }
+      },
+      {
+        "id": "n-clinical",
+        "label": "Clinical / Product Performance",
+        "iconId": "source-clinical-performance",
+        "vendor": "generic",
+        "notes": "Post-market clinical follow-up (PMCF) data, clinical trial results, literature surveillance findings, and real-world performance evidence",
+        "x": 60,
+        "y": 440,
+        "metadata": { "group": "Device & Source Data" }
+      },
+      {
+        "id": "n-mfg",
+        "label": "Manufacturing / MES / Quality",
+        "iconId": "source-mes",
+        "vendor": "generic",
+        "notes": "Lot records, process parameters, in-process quality checks, final acceptance testing data, and equipment calibration records from the MES",
+        "x": 60,
+        "y": 560,
+        "metadata": { "group": "Device & Source Data" }
+      },
+      {
+        "id": "n-autoloader",
+        "label": "Auto Loader",
+        "iconId": "databricks-data-ingestion",
+        "vendor": "databricks",
+        "notes": "Batch ingestion for QMS exports, regulatory document processing, clinical data, and MES lot records with 21 CFR Part 11 audit trail",
+        "x": 300,
+        "y": 220,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-dlt",
+        "label": "Delta Live Tables",
+        "iconId": "databricks-dlt",
+        "vendor": "databricks",
+        "notes": "Real-time DLT pipelines for device telemetry streaming with device identity validation, telemetry range checks, and SPC-based anomaly detection",
+        "x": 300,
+        "y": 420,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-bronze",
+        "label": "Bronze Layer",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Raw device data archive with 21 CFR Part 11 compliant audit history, source checksums, and device-level provenance for regulatory inspection",
+        "x": 560,
+        "y": 300,
+        "metadata": { "group": "Bronze Layer" }
+      },
+      {
+        "id": "n-silver",
+        "label": "Silver Layer (Device 360)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "UDI-resolved Device 360: operational telemetry history, complaint and CAPA linkages, regulatory filing status, and manufacturing genealogy per device instance",
+        "x": 760,
+        "y": 300,
+        "metadata": { "group": "Silver Layer" }
+      },
+      {
+        "id": "n-gold",
+        "label": "Gold Layer (Device Intelligence)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Safety signal tables, predictive maintenance risk scores, MDR reporting queues, regulatory submission packages, and field service priority lists",
+        "x": 960,
+        "y": 300,
+        "metadata": { "group": "Gold Layer" }
+      },
+      {
+        "id": "n-uc",
+        "label": "Unity Catalog",
+        "iconId": "databricks-governance",
+        "vendor": "databricks",
+        "notes": "21 CFR Part 820 audit trails, regulatory document lineage, complaint data access controls, GxP compliance metadata, and device data classification",
+        "x": 760,
+        "y": 560,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-sql",
+        "label": "SQL Warehouses",
+        "iconId": "databricks-sql-warehouses",
+        "vendor": "databricks",
+        "notes": "SQL Warehouses for quality and regulatory analysts, complaint review teams, PMCF data analysis, and field service team reporting",
+        "x": 1160,
+        "y": 160,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-analytics",
+        "label": "Device Analytics",
+        "iconId": "databricks-dashboards",
+        "vendor": "databricks",
+        "notes": "Device fleet performance dashboards, complaint trend monitoring, manufacturing quality scorecards, and post-market surveillance reporting",
+        "x": 1310,
+        "y": 200,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-ai",
+        "label": "Predictive Maintenance AI",
+        "iconId": "databricks-models",
+        "vendor": "databricks",
+        "notes": "MLflow-managed device health scoring model predicting service need 30-60 days in advance from telemetry patterns, providing prioritized field service queues",
+        "x": 1240,
+        "y": 420,
+        "metadata": { "group": "Analytics & AI" }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n-devices", "target": "n-dlt", "label": "Real-time telemetry stream", "protocol": "MQTT/HTTPS" },
+      { "id": "e2", "source": "n-qms", "target": "n-autoloader", "label": "QMS batch export", "protocol": "API/SFTP" },
+      { "id": "e3", "source": "n-regdocs", "target": "n-autoloader", "label": "Document batch export", "protocol": "API/SFTP" },
+      { "id": "e4", "source": "n-clinical", "target": "n-autoloader", "label": "Clinical data export", "protocol": "SFTP/API" },
+      { "id": "e5", "source": "n-mfg", "target": "n-autoloader", "label": "MES lot records batch", "protocol": "SFTP/API" },
+      { "id": "e6", "source": "n-autoloader", "target": "n-bronze", "label": "Raw Delta write with audit", "protocol": "Delta" },
+      { "id": "e7", "source": "n-dlt", "target": "n-bronze", "label": "Streaming Delta write", "protocol": "Delta" },
+      { "id": "e8", "source": "n-bronze", "target": "n-silver", "label": "Device 360 integration", "protocol": "Spark" },
+      { "id": "e9", "source": "n-silver", "target": "n-gold", "label": "Intelligence aggregation", "protocol": "Spark" },
+      { "id": "e10", "source": "n-silver", "target": "n-uc", "label": "Device data registration", "protocol": "Unity Catalog" },
+      { "id": "e11", "source": "n-gold", "target": "n-uc", "label": "Intelligence products registration", "protocol": "Unity Catalog" },
+      { "id": "e12", "source": "n-gold", "target": "n-sql", "label": "SQL query access", "protocol": "SQL" },
+      { "id": "e13", "source": "n-sql", "target": "n-analytics", "label": "Dashboard queries", "protocol": "SQL" },
+      { "id": "e14", "source": "n-gold", "target": "n-ai", "label": "Telemetry features", "protocol": "MLflow" },
+      { "id": "e15", "source": "n-uc", "target": "n-ai", "label": "Governed device data access", "protocol": "Unity Catalog" }
+    ],
+    "refinements": [
+      "Add automated MDR/IVDR reporting workflow that generates draft regulatory reports from safety signal data within 24 hours of signal confirmation",
+      "Build a literature surveillance AI that monitors PubMed and regulatory databases for publications mentioning device model names and complaint trends",
+      "Implement digital twin modeling for each device model using telemetry data to simulate failure modes and optimize service intervals",
+      "Add a regulatory change monitoring system that tracks FDA guidance and EU MDR updates and identifies impacted device families",
+      "Build a PMCF study automation tool that generates post-market clinical follow-up protocols from real-world device performance data"
+    ]
+  },
+  "architectAnswers": {
+    "why_w1": "Connected medical devices are generating telemetry data that could predict failures 30-60 days in advance, but the data is siloed in an IoT platform that has no integration with the QMS complaint system. When a device fails in the field, the service team has no visibility into whether similar telemetry patterns preceded other field failures. The Device Intelligence Platform enables this closed-loop learning from field experience.",
+    "why_w2": "MDR 2017/745 requires manufacturers to report serious incidents to competent authorities within 15 days of becoming aware of them. Currently, detecting that an adverse event or complaint constitutes a reportable serious incident requires manual review by the regulatory affairs team, who may not be notified promptly because complaint data and telemetry data are in separate systems. Integrating these data streams enables automated serious incident detection with automated notification of the regulatory team.",
+    "why_w3": "ISO 13485 requires demonstrated effectiveness of the Post-Market Surveillance (PMS) system, including trend analysis and proactive signal detection across complaint data, adverse event reports, and scientific literature. The current siloed infrastructure cannot perform cross-source signal detection, putting the company's ISO 13485 certification at risk during the next audit.",
+    "why_h1": "The field service team schedules preventive maintenance on a fixed calendar interval (annually for most devices), regardless of actual device utilization and wear. For high-utilization devices (running 300+ cycles per day), annual service is insufficient — they fail before the next scheduled service. For low-utilization devices, annual service is wasteful. A utilization-based predictive maintenance model reduces both field failures and unnecessary service visits.",
+    "why_h2": "Manufacturing quality issues in device lots are discovered after devices are deployed in the field — when complaints start arriving about a specific manufacturing batch. Correlating lot-level manufacturing data with field performance data in the Device 360 enables post-market surveillance by lot, enabling earlier detection of manufacturing-related performance issues and more targeted field actions (targeted service vs full recall).",
+    "why_h3": "The regulatory intelligence opportunity: the company has 50+ device families across 80+ countries with different regulatory submission requirements. Managing these submissions manually across an 8-person regulatory affairs team is unsustainable as the product portfolio grows. AI-powered regulatory document analysis and submission status tracking across Unity Catalog dramatically reduces the regulatory burden per device family.",
+    "goal_g1": "The primary goal is a UDI-resolved Device 360 in Silver for all 45,000 deployed devices in the company's active fleet, integrating telemetry history, complaint records, CAPA linkages, regulatory filing status, and manufacturing genealogy into a single queryable entity that enables fleet-level safety signal detection within 24 hours of complaint entry.",
+    "goal_g2": "The predictive maintenance AI must achieve a minimum 65% positive predictive value (PPV) for device failure within 60 days of model alert, validated against a held-out test set of historical field failures. This performance threshold is required to justify proactive service interventions — the field service team will not act on recommendations below this threshold.",
+    "goal_o1": "Quality and regulatory team operations: the complaint team receives a daily dashboard showing new complaints, their automatic severity classification, and a preliminary assessment of whether they may constitute MDR reportable events — reducing the time from complaint receipt to regulatory notification decision from 5 days to same-day.",
+    "goal_o2": "Field service operations: the field service team receives a weekly prioritized service list showing devices in each region with predicted failure risk scores above the intervention threshold, enabling proactive service scheduling that replaces the reactive break-fix model. Target: reduce emergency field service calls by 30% in the first year.",
+    "goal_a1": "Telemetry ingestion must handle 45,000 devices × 100 data points × 1 reading/minute = 4.5 million telemetry readings per minute at peak. DLT Structured Streaming with Dynamic Allocation auto-scales to handle this volume. Bronze layer data must be available for signal detection within 5 minutes of device transmission.",
+    "goal_a2": "Safety signal detection runs daily on all active complaint records. Statistical process control algorithms and disproportionality analysis (PRR/ROR) complete the full analysis across 500,000+ complaint records within 4 hours, ensuring signals are available for regulatory team review every morning.",
+    "goal_l1": "Device telemetry data from EU-deployed devices is subject to GDPR where telemetry can be linked to a patient user. EU device data is stored in an EU cloud region. Personal identifiers (device installation location, patient ID where captured) are masked in the Silver layer. Telemetry used for predictive maintenance models is pseudonymized before model training.",
+    "goal_l2": "Complaint data access is restricted by product line and role: quality engineers for each product family see complaints for their products; regulatory affairs sees all complaints; field service sees device performance data but not patient-related complaint details. Unity Catalog row-level security enforces product-family-level access controls.",
+    "safe_s1": "21 CFR Part 11 compliance for complaint and CAPA data: all data modifications are logged with user identity, timestamp, and reason for change. Electronic signatures are required for quality record approvals. The Databricks audit log and Delta Lake transaction history provide the complete audit trail required by 21 CFR Part 11 for all complaint and CAPA records processed through the lakehouse.",
+    "safe_s2": "MDR 2017/745 Article 87 requires manufacturers to report serious incidents to competent authorities. The platform's automated serious incident detection generates a draft MDR report with the required structured data within 24 hours of serious incident identification, giving the regulatory affairs team a head start on the 15-day reporting window. The draft report is reviewed and approved by regulatory affairs before submission.",
+    "safe_a1": "Device telemetry data integrity: each telemetry transmission includes a digital signature from the device's secure element. The DLT ingestion pipeline validates this signature before writing to Bronze, preventing injection of fraudulent telemetry data that could generate false maintenance alerts or mask real safety signals. Invalid signatures are quarantined and trigger a device integrity alert.",
+    "safe_a2": "GxP validation: the Databricks workspace is qualified under a GxP validation protocol covering the complaint and CAPA data processing components. The predictive maintenance AI model is qualified as a Software as a Medical Device (SaMD) component under FDA's Software Guidance, with documented evidence of algorithm transparency, training data quality, and performance monitoring.",
+    "safe_f1": "Complaint data quality validation: DLT expectations enforce that each complaint record has the mandatory fields required for MDR/MDR assessment: complaint receipt date, device UDI, complaint description, patient involvement indicator, and country of occurrence. Complaints missing mandatory fields are quarantined and trigger an alert to the complaint intake team for remediation within 24 hours.",
+    "safe_e1": "The safety signal detection pipeline has a 4-hour RTO and 1-hour RPO, reflecting the regulatory importance of timely adverse event monitoring. Delta Lake transaction logs are replicated cross-region. Automated failover testing is performed monthly. Safety-critical pipeline failures trigger immediate PagerDuty alerts to both the platform engineering team and the regulatory affairs team.",
+    "safe_e2": "EU MDR reporting obligations have strict 15-day deadlines for serious incidents and 7-day deadlines for imminently life-threatening incidents. The platform's incident detection and reporting queue is designed with these timelines as hard SLAs. Regulatory affairs receives automated daily summaries of pending reportable events with days-remaining countdowns.",
+    "flow_f1": "Data flows: Device telemetry (real-time) → DLT → Bronze → Device 360 Silver update → Gold predictive maintenance score refresh (daily). QMS complaints (daily export) → Auto Loader → Bronze → Device 360 complaint linkage → Gold safety signal detection run. Manufacturing lot data (weekly) → Auto Loader → Bronze → Device 360 manufacturing genealogy → Gold lot-level performance correlation.",
+    "flow_l1": "The telemetry streaming pipeline is the highest-volume flow: 4.5 million readings per minute processed by DLT Structured Streaming with Dynamic Allocation scaling from 20 to 200 workers during peak device operating hours (6 AM - 10 PM). Raw telemetry in Bronze is available within 5 minutes of device transmission. Device health scores in Gold are updated daily rather than in real-time, balancing model accuracy with compute cost.",
+    "flow_o1": "Safety signal detection flow: daily complaint delta from QMS → Bronze → Silver Device 360 update → Gold signal detection run (SPC analysis + PRR/ROR disproportionality) → suspected signals written to Gold signal queue → regulatory affairs dashboard notification → manual regulatory review → MDR report generation workflow triggered. Each step is logged in Unity Catalog with timestamp and analyst identity.",
+    "flow_w1": "Databricks Workflows orchestrates: telemetry streaming (continuous DLT pipeline); daily complaint ingestion and signal detection (nightly batch window, results by 6 AM); weekly manufacturing data load and lot correlation analysis; monthly PMCF data synthesis for post-market surveillance reports; quarterly predictive maintenance model retraining. SLA monitoring triggers regulatory affairs alerts for signal detection and MDR reporting deadlines.",
+    "data_d1": "Core device data domains: Device Registry (UDI, model number, version, manufacturer date, serial number, production lot); Telemetry History (timestamped operational parameters, error codes, usage counters, environmental readings per device instance); Complaint Register (complaint ID, device UDI, complaint type, severity, patient involvement, country, MDR status); CAPA Register (CAPA ID, trigger complaint or trend, investigation status, corrective action, effectiveness check); and Regulatory Filing Registry (510(k)/PMA/CE mark filing status, approval dates, conditions, renewal timelines by device and market).",
+    "data_d2": "Manufacturing quality domain: Lot Master (lot number, production date, batch size, product code); Process Parameters (critical process parameters recorded per lot, with upper and lower control limits); In-Process Testing (in-process quality check results per lot with pass/fail status); Final Acceptance Testing (sterility, dimensional, functional, and biocompatibility testing results per lot); and Component Genealogy (critical component lot numbers and supplier certificates of conformance per finished device lot).",
+    "data_a1": "Telemetry data quality challenges: devices with intermittent connectivity generate data gaps that must be distinguished from actual device downtime. A device health model must account for these gaps without misclassifying communication outages as device failures. DLT expectations flag telemetry records with unexpected gaps (>4 hours for devices expected to be continuously operational) and route them to a data quality review queue.",
+    "data_a2": "Complaint coding consistency is a significant data quality challenge. Complaint narratives are entered as free text, then coded to standard categorization schemes (FDA MDR Product Problem codes, MedDRA terms). Coding is performed by trained complaint specialists but varies by individual. An NLP-based complaint coding assistance model in the Silver layer proposes standardized codes for review, improving coding consistency across the complaint dataset.",
+    "data_t1": "FDA UDI (Unique Device Identifier) is the primary device identity key, linking device instances across complaint records, service records, and regulatory filings. The UDI contains the device identifier (DI) portion (model-level) and the production identifier (PI) portion (lot, serial, expiration date). The Device 360 uses the full UDI for device-instance-level analysis and the DI portion for model-family-level signal detection.",
+    "data_t2": "Time-series telemetry data requires specialized data modeling: the Bronze layer stores raw telemetry as individual timestamped records. The Silver layer computes derived features (rolling averages, trend slopes, statistical control limits) at daily aggregation intervals for each device parameter. The Gold layer stores the model-ready feature matrix indexed by device UDI and date, enabling efficient model training and inference without raw telemetry access.",
+    "data_a3": "Medical device records must be retained for 2 years post-manufacture or the lifetime of the device, whichever is longer (21 CFR 820.180). For Class III devices, records must be retained for the life of the device or 2 years after the last date of manufacture. The Bronze layer retains all ingested records indefinitely. Silver and Gold layers are retained for 10 years with automated lifecycle management archiving older data to queryable cold storage.",
+    "data_a4": "Complaint data lineage is critical for regulatory inspection: when an FDA inspector requests the data supporting an MDR report, the lineage from the report back through the Gold signal table, Silver Device 360, Bronze complaint record, and the original QMS complaint entry must be queryable in seconds. Unity Catalog lineage provides this end-to-end provenance without manual reconstruction.",
+    "fast_f1": "The fastest path to value is the complaint trend dashboard for the quality and regulatory team. Aggregating complaint data from the QMS into a searchable, filterable dashboard with trend analysis by device model, complaint code, and country takes 6-8 weeks and delivers immediate visibility into fleet performance that currently requires manual analysis. This dashboard is high-visibility for the Chief Quality Officer.",
+    "fast_f2": "A targeted predictive maintenance pilot on the company's highest-volume device model (the device with the most telemetry data and best-documented field failure history) can produce a validated baseline model in 10-12 weeks. Using 18 months of historical telemetry and field service records, an initial model with 55-65% PPV is achievable — enough to demonstrate the approach before scaling to the full fleet.",
+    "fast_a1": "The 14-week rapid deployment plan: Weeks 1-3 cover infrastructure, Unity Catalog device data governance model, and Auto Loader for QMS complaint and manufacturing data. Weeks 4-7 add telemetry streaming via DLT and Bronze Device 360 integration. Weeks 8-11 deliver Silver Device 360 with UDI resolution and Gold complaint trend analytics. Weeks 12-14 deliver the predictive maintenance pilot and safety signal detection POC.",
+    "fast_a2": "The Device Registry in the Silver layer (UDI to device model/version/lot mapping) should be built and validated first, before any other Silver layer development. All other Silver entities reference the Device Registry. Investing 2 weeks in a high-quality Device Registry saves many weeks of data reconciliation downstream.",
+    "fast_s1": "90-day quick wins: (1) Complaint trend dashboard for quality team showing new complaints by device model, code, and country; (2) Lot-level complaint correlation for manufacturing quality team; (3) MDR regulatory filing status dashboard for regulatory affairs; (4) Telemetry ingestion pipeline for the pilot device model with real-time device health view. Each delivers immediate stakeholder value.",
+    "fast_t1": "The Databricks Life Sciences solution accelerator for medical device post-market surveillance includes pre-built notebooks for complaint trend analysis, SPC-based signal detection, and PRR/ROR disproportionality analysis. Leveraging these accelerators reduces the safety signal detection development from 8-10 weeks to 3-4 weeks.",
+    "fast_t2": "MLflow AutoML can train a baseline predictive maintenance model using telemetry time-series features (rolling means, standard deviations, trend slopes over 7/30/90-day windows) and field service records in 1-2 weeks. This baseline provides a starting point for the model validation process required for SaMD qualification, enabling the regulatory affairs and quality teams to begin the validation protocol early.",
+    "run_r1": "Platform operations: 3 data engineers for ingestion pipelines and Device 360 maintenance; 2 data scientists for predictive maintenance model and signal detection algorithm maintenance; 1 platform administrator for Unity Catalog governance and GxP compliance; 1 regulatory data analyst for MDR reporting workflow and signal review queue management. Quality engineers and regulatory affairs operate the complaint and signal review interfaces without data engineering support.",
+    "run_r2": "The predictive maintenance program's ROI justifies significant platform investment: each avoided emergency field service call saves $1,500-3,000 in travel and emergency labor costs. At 1,000 avoided emergency calls per year from a 30% reduction in emergency service volume, the program generates $1.5-3M in annual field service cost savings — more than sufficient to cover platform operating costs.",
+    "run_u1": "The predictive maintenance model is retrained quarterly using the most recent 18 months of telemetry and field service data. Model performance monitoring tracks PPV, NPV, and alert rate weekly. If PPV drops below 55% for 2 consecutive weeks, an automatic retraining is triggered. Model updates go through an abbreviated SaMD change control process — impact assessment, updated validation report, regulatory affairs sign-off — before production deployment.",
+    "run_u2": "New device models are onboarded to the Device Intelligence Platform through a standard onboarding process: Device Registry entry with UDI structure documentation, telemetry data dictionary definition, complaint categorization mapping to standard codes, and DLT pipeline provisioning from the standard template. Target onboarding time for a new device model: 4 weeks from data access to production-ready Device 360.",
+    "run_n1": "EU MDR compliance requires that clinical and complaint data for EU-marketed devices is processed within the EU. An EU Databricks workspace mirrors the US workspace for EU device data, with Unity Catalog metadata synchronized between regions for global analytics. EU device data never leaves the EU for any processing. GDPR data subject access requests for patient-associated device data are fulfilled within 30 days.",
+    "win_w1": "Platform success at 18 months: (1) 45,000-device fleet covered by Device 360 with complaint and telemetry integration; (2) Predictive maintenance pilot achieving 65%+ PPV with 25%+ reduction in emergency field calls for pilot device model; (3) MDR reporting workflow reducing time-to-report from 5 days to 24 hours; (4) Safety signal detection running daily with no missed reportable events in the first year; (5) ISO 13485 post-market surveillance audit passed with no major findings.",
+    "win_i1": "5-year business impact: $5M in avoided field service emergency costs; $8M in avoided recall costs through earlier safety signal detection and targeted field actions; $3M in regulatory submission efficiency savings; $2M in manufacturing quality improvement savings from lot-level performance correlation. Zero FDA warning letters related to post-market surveillance failures — protecting revenue from uninterrupted market access.",
+    "win_n1": "The Device Intelligence Platform becomes the company's competitive differentiator in an increasingly connected medical device market. Over 5 years, the platform evolves into a real-time patient safety monitoring system — detecting device performance issues in individual patients and providing proactive clinical support notifications to care teams, transforming the company from a device manufacturer into a connected care platform company."
+  },
+  "story": {
+    "strategy": "The medical device company built the Device 360 as the core asset of its post-market surveillance transformation, recognizing that regulatory agencies (FDA, notified bodies) are increasingly expecting manufacturers to demonstrate active, data-driven post-market monitoring — not just reactive complaint handling. The Device 360 enables both proactive safety monitoring and on-demand regulatory evidence generation from a single governed platform.",
+    "technology": "The platform uses Databricks DLT for real-time telemetry streaming with device signature validation, Auto Loader for QMS and manufacturing batch data, and a custom Statistical Process Control implementation in the Gold layer for complaint-based safety signal detection. Unity Catalog serves as the regulatory evidence repository — every signal, every report, and every model inference is traceable to source data for regulatory inspection. The predictive maintenance model is qualified as SaMD under FDA's Software Guidance.",
+    "outcome": "Within 18 months, the Device 360 covered all 45,000 devices in the deployed fleet. The predictive maintenance pilot on the company's highest-volume ventilator model achieved 72% PPV and enabled 1,200 proactive service interventions in its first year, avoiding an estimated 380 emergency service calls. Safety signal detection identified an emerging complaint pattern on a cardiac monitoring device 6 weeks earlier than the previous manual review process — enabling a proactive field safety corrective action before an MDR-reportable serious injury occurred.",
+    "returnValue": "Year 1-3 measured returns: $4.2M in avoided emergency field service costs; $12M in avoided recall costs from the early cardiac monitor safety signal detection; $2.8M in regulatory submission efficiency savings from automated MDR draft generation and regulatory filing tracking; $1.5M in manufacturing quality improvements from lot-level performance correlation. Total 3-year return: $20.5M against a $4.1M platform investment — 5:1 ROI.",
+    "years": "Over 5 years, the Device 360 evolves into a real-world evidence platform that supports continuous regulatory benefit-risk assessment. Historical telemetry and outcome data across 200,000+ device-years of experience enables the company to demonstrate device safety and effectiveness to regulators with unprecedented data richness. The predictive maintenance AI evolves into a patient safety monitoring system — the company transitions from selling devices to selling connected care outcomes, commanding a 30-40% premium over unconnected competitors."
+  },
+  "playbook": {
+    "scenarioTitle": "Medical Device Intelligence Platform",
+    "scenarioSummary": "A global medical device company needs to unify connected device telemetry, QMS complaint data, regulatory documents, clinical performance data, and manufacturing records into a Databricks Lakehouse. The platform enables predictive maintenance AI, proactive MDR safety signal detection, automated regulatory compliance workflows, and fleet-level device intelligence.",
+    "businessDrivers": [
+      "MDR/IVDR 2017/745 regulatory requirements for proactive post-market surveillance and safety signal detection",
+      "45,000-device fleet generating predictive maintenance telemetry that cannot be analyzed without a unified data platform",
+      "Reactive complaint-to-MDR workflow taking 5 days when regulations require 15-day reporting",
+      "Manufacturing lot-level field performance correlation is impossible without linking MES and complaint data",
+      "ISO 13485 audit findings related to inadequate PMS data integration risk certification status"
+    ],
+    "constraints": [
+      "21 CFR Part 820 and MDR 2017/745 compliance requires audit trails and GxP validation for complaint and CAPA data processing",
+      "EU device data must remain in EU cloud region for GDPR and EU MDR compliance",
+      "Predictive maintenance AI qualifies as SaMD and requires validation under FDA/IVDR software guidance"
+    ],
+    "recommendedEngagementApproach": [
+      "Begin with a post-market surveillance gap assessment to quantify the regulatory risk of the current siloed infrastructure",
+      "Deliver a complaint trend analysis POC using existing QMS data to demonstrate immediate analytics value",
+      "Engage regulatory affairs and quality leadership together — both must be co-sponsors for a GxP-impacting platform",
+      "Propose the predictive maintenance pilot on the highest-telemetry device model as the AI proof of value"
+    ],
+    "confidenceRating": 86,
+    "recommendedConversationPath": [
+      "Regulatory risk: What did the last ISO 13485 audit say about PMS data integration?",
+      "MDR timelines: How long does the current complaint-to-MDR decision process take?",
+      "Telemetry: How many devices transmit telemetry, what parameters, at what frequency?",
+      "Field service: What percentage of field service calls are emergency vs preventive?",
+      "GxP: What is the team's experience validating cloud-based systems for GxP use?"
+    ],
+    "discoveryQuestions": [
+      {
+        "category": "Regulatory Risk",
+        "question": "What were the findings from your most recent ISO 13485 audit or FDA inspection related to post-market surveillance and complaint handling?",
+        "whyItMatters": "Audit findings create urgency and budget for infrastructure improvement. A major finding on PMS data integration is the strongest possible sponsor for this platform.",
+        "goodSignal": "Audit finding or observation on inadequate trend analysis or signal detection capability — direct mandate for the platform.",
+        "redFlag": "Clean audit with no PMS-related findings — the regulatory risk driver is not immediate, and business drivers (field service cost, revenue) must carry the ROI case."
+      },
+      {
+        "category": "Connected Devices",
+        "question": "What percentage of your deployed device fleet transmits telemetry, what parameters are captured, and what is the current telemetry data retention and analysis capability?",
+        "whyItMatters": "Telemetry volume and richness determine the feasibility and ROI of the predictive maintenance AI. Low telemetry coverage or sparse parameters limit model performance.",
+        "goodSignal": "80%+ of deployed devices transmit telemetry with 50+ parameters at 1-minute frequency and 18+ months of historical data available.",
+        "redFlag": "Less than 20% telemetry coverage or only 5-10 error code parameters — insufficient data for a meaningful predictive maintenance model. Start with complaint analytics and defer predictive maintenance."
+      },
+      {
+        "category": "Field Service Operations",
+        "question": "What percentage of field service calls are unplanned emergency calls vs scheduled preventive maintenance, and what is the average cost per emergency field service call?",
+        "whyItMatters": "The field service cost reduction opportunity is the primary quantifiable ROI for the predictive maintenance AI. Emergency call rate and cost per call determine the ROI model.",
+        "goodSignal": "30%+ unplanned emergency calls at $2,000+ per call — significant ROI from even a modest reduction in emergency service volume.",
+        "redFlag": "Field service is primarily warranty-funded and costs are not tracked in a way that creates business urgency. Regulatory compliance becomes the primary driver."
+      },
+      {
+        "category": "MDR Compliance",
+        "question": "How many MDR reports did you submit in the last 12 months, and have you ever missed or risked missing the 15-day or 7-day MDR reporting deadline?",
+        "whyItMatters": "Near-misses on MDR deadlines create regulatory risk and urgency for the automated reporting workflow. A missed deadline represents a serious regulatory event.",
+        "goodSignal": "50+ MDR reports annually, at least one near-miss on a reporting deadline, and regulatory affairs manually tracking all open potential MDRs in a spreadsheet.",
+        "redFlag": "Fewer than 5 MDR reports annually — very low volume that doesn't justify MDR automation as a primary use case."
+      },
+      {
+        "category": "GxP Validation Readiness",
+        "question": "Does your quality team have experience validating cloud-based software systems under 21 CFR Part 820 and Part 11, and do you have a GxP validation SOPs for cloud systems?",
+        "whyItMatters": "GxP validation is required for the complaint and CAPA data processing components and will add 3-6 months to deployment. Existing experience dramatically reduces this timeline.",
+        "goodSignal": "Quality team has validated cloud QMS systems and has a GxP cloud validation SOP template — validation can proceed in parallel with development.",
+        "redFlag": "No cloud GxP validation experience and significant internal resistance from quality team — validation scope must be carefully negotiated and may extend timeline significantly."
+      }
+    ],
+    "problemFraming": {
+      "statement": "A global medical device company's post-market surveillance, field service, and regulatory compliance programs are undermined by data fragmentation — connected device telemetry, complaint records, regulatory filings, clinical performance data, and manufacturing records exist in separate systems that cannot be integrated for proactive safety monitoring, predictive maintenance, or automated regulatory reporting.",
+      "desiredOutcomes": [
+        "Device 360 for all 45,000 deployed devices with telemetry, complaint, and manufacturing genealogy integration",
+        "MDR reportable event detection within 24 hours of complaint entry, reducing time-to-report from 5 days",
+        "Predictive maintenance AI achieving 65%+ PPV and reducing emergency field service calls by 25%",
+        "Safety signal detection running daily across the full complaint database with automated signal queue",
+        "ISO 13485 PMS audit readiness with fully governed, traceable post-market data estate"
+      ],
+      "assumptions": [
+        "GxP validation of the Databricks platform for complaint and CAPA data is achievable within 6 months",
+        "Connected devices transmit sufficient telemetry parameters for a meaningful predictive maintenance model",
+        "The QMS system API provides access to complaint and CAPA records for lakehouse ingestion",
+        "The predictive maintenance AI can be qualified under FDA SaMD guidance within 12 months"
+      ],
+      "nonNegotiables": [
+        "21 CFR Part 11 compliant audit trails for all complaint and CAPA data processing",
+        "EU device data must remain in EU cloud region for MDR and GDPR compliance",
+        "Zero missed MDR reporting deadlines — automated detection and workflow must have 100% recall for serious incidents"
+      ],
+      "unknowns": [
+        "Telemetry data quality and completeness across the full device fleet",
+        "GxP validation scope and timeline for the cloud platform",
+        "SaMD regulatory pathway for the predictive maintenance AI model"
+      ],
+      "framingStatement": "By building a Device Intelligence Platform on Databricks that unifies all post-market data sources, we transform the company's post-market surveillance from a reactive compliance exercise into a proactive safety program — detecting signals earlier, preventing field failures, and demonstrating regulatory excellence to FDA and notified bodies through data-driven evidence."
+    },
+    "architectureOptions": [
+      {
+        "name": "GxP-Validated Device Intelligence Lakehouse",
+        "summary": "A medallion architecture with Device 360 in Silver, safety signal detection and predictive maintenance in Gold, GxP validation for complaint/CAPA processing, and Unity Catalog audit trails — designed for ISO 13485 and MDR compliance.",
+        "whenToUse": [
+          "45,000+ deployed device fleet with telemetry transmission capability",
+          "MDR/IVDR regulatory reporting requirements requiring automated serious incident detection",
+          "ISO 13485 post-market surveillance requirements for statistical trend analysis",
+          "Predictive maintenance ROI from reducing emergency field service calls"
+        ],
+        "benefits": [
+          "Device 360 enables cross-source analysis impossible in today's siloed infrastructure",
+          "Automated MDR detection and reporting workflow reduces regulatory risk of missed reporting deadlines",
+          "Predictive maintenance AI generates $1.5-3M annual ROI from emergency service reduction",
+          "Unity Catalog audit trails provide FDA inspection-ready data provenance documentation"
+        ],
+        "tradeoffs": [
+          "GxP validation of the cloud platform adds 4-6 months to deployment and requires dedicated quality resources",
+          "Predictive maintenance model validation as SaMD requires FDA regulatory strategy engagement",
+          "EU multi-region deployment for MDR compliance increases infrastructure complexity and cost"
+        ],
+        "idealMaturityLevel": "Intermediate",
+        "platformMapping": [
+          "DLT → real-time telemetry streaming with device signature validation",
+          "Auto Loader → QMS, regulatory document, and MES batch ingestion",
+          "Silver Device 360 → UDI-resolved device entity with all data sources integrated",
+          "Gold Signal Detection → SPC and disproportionality analysis on complaint data",
+          "MLflow → predictive maintenance model with SaMD validation documentation"
+        ],
+        "components": [
+          { "layer": "Ingestion", "items": ["DLT (telemetry streaming, device validation)", "Auto Loader (QMS, MES, regulatory docs)", "Device signature verification"] },
+          { "layer": "Silver", "items": ["Device Registry (UDI resolution)", "Device 360 (telemetry + complaints + manufacturing)", "CAPA linkage graph"] },
+          { "layer": "Gold", "items": ["Safety signal tables (SPC + PRR/ROR)", "Predictive maintenance risk scores", "MDR reporting queue", "Lot-level performance correlation"] },
+          { "layer": "Governance", "items": ["21 CFR Part 11 audit log", "GxP validation documentation", "EU data residency controls"] }
+        ],
+        "talkTrack": [
+          "The Device 360 closes the loop between what's happening in the field and what came off the manufacturing line — for the first time, you'll be able to ask 'did the devices from Lot XYZ perform differently than Lot ABC in the field?'",
+          "Safety signal detection running daily means you catch complaint patterns in weeks rather than months — and with automated MDR draft generation, your regulatory team has a head start on the 15-day reporting clock from the moment a signal is confirmed.",
+          "The predictive maintenance model doesn't replace your field service team — it gives them a prioritized weekly list of devices to proactively service before they fail, so they spend less time on emergency calls and more time on planned work."
+        ]
+      }
+    ],
+    "mockInterview": [],
+    "customerQuestions": [
+      {
+        "question": "Does the predictive maintenance AI require FDA clearance as a Software as a Medical Device?",
+        "bestAnswer": "The regulatory pathway depends on how the model's output is used. If the model's output is used to make clinical decisions about patient care (e.g., 'stop using this device with this patient'), it likely requires 510(k) clearance as SaMD. If it's used to prioritize field service maintenance scheduling (an operational decision, not a clinical decision), it may qualify as Software in a Medical Device (SiMD) or fall below the SaMD threshold. We recommend engaging FDA regulatory counsel early to define the intended use and confirm the regulatory pathway before the model is deployed.",
+        "notes": "This is a critical compliance question that requires regulatory expertise to answer definitively. Position Databricks as the data platform and recommend the customer engage specialized medical device regulatory counsel for the SaMD question.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      },
+      {
+        "question": "Our QMS is GxP-validated and we can't risk its validation status. How does the lakehouse integration avoid invalidating it?",
+        "bestAnswer": "The lakehouse integration reads from the QMS via a validated export API or batch file — it does not write back to the QMS or modify any QMS data. The QMS remains the system of record for all complaint and CAPA records. The lakehouse is a separate analytical system that receives a copy of QMS data for analytics purposes. This read-only integration does not affect the QMS's validation status, as it doesn't modify the QMS's data, logic, or interfaces. The lakehouse itself requires its own GxP qualification as a separate computerized system.",
+        "notes": "The read-only integration architecture is the key safety net for QMS validation concerns. Emphasize that the QMS remains the system of record and the lakehouse is an analytical copy only.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      }
+    ],
+    "risks": [
+      {
+        "title": "GxP Validation Scope Creep",
+        "description": "Medical device quality teams often expand GxP validation scope beyond what is strictly necessary, requiring validation of all Databricks platform components including development notebooks and exploratory analytics that are not part of the regulated data processing workflow.",
+        "likelihood": "High",
+        "impact": "Medium",
+        "mitigation": "Define the GxP validation boundary clearly in the project charter: only the production complaint processing pipeline and CAPA linkage in Silver require GxP qualification. Exploratory analytics, predictive maintenance (non-clinical decision use), and Gold layer dashboards for quality metrics may not require GxP qualification. Engage the quality team early to agree on the validation boundary."
+      },
+      {
+        "title": "Telemetry Data Gaps and Quality",
+        "description": "Devices with intermittent connectivity create telemetry gaps that can be misinterpreted as device downtime by the predictive maintenance model, leading to false maintenance alerts and loss of field team confidence.",
+        "likelihood": "High",
+        "impact": "Medium",
+        "mitigation": "Build a device connectivity model as part of the Silver layer that distinguishes expected connectivity patterns from anomalous gaps. Use a separate connectivity health indicator alongside device health in the predictive maintenance model. Track model PPV and false positive rate weekly and communicate transparently with the field service team."
+      },
+      {
+        "title": "MDR Safety Signal False Positives",
+        "description": "Statistical signal detection algorithms may generate signals for complaint patterns that are not clinically meaningful, overwhelming the regulatory affairs team with false positive signal reviews.",
+        "likelihood": "Medium",
+        "impact": "Medium",
+        "mitigation": "Calibrate signal detection thresholds using 12 months of historical complaint data, setting the sensitivity and specificity at levels that generate 3-5 signals per week for regulatory review rather than dozens. Implement a signal triage workflow that uses device usage volume (signals from high-volume devices are more statistically significant) and complaint severity to prioritize the review queue."
+      }
+    ],
+    "deliverables": [
+      {
+        "name": "Medical Device Intelligence Platform Architecture Blueprint",
+        "purpose": "Comprehensive technical design for the Device 360 Databricks Lakehouse including telemetry ingestion, Device 360 schema, safety signal detection algorithms, predictive maintenance AI architecture, GxP validation strategy, and MDR workflow automation.",
+        "outline": [
+          "Executive summary and regulatory compliance ROI model",
+          "Device fleet and data source landscape assessment",
+          "Telemetry streaming architecture (DLT, device validation)",
+          "Device 360 Silver schema design (UDI, telemetry, complaints, manufacturing)",
+          "Safety signal detection Gold layer design (SPC, PRR/ROR)",
+          "Predictive maintenance AI architecture and SaMD qualification strategy",
+          "MDR reporting workflow design",
+          "GxP validation strategy and qualification boundary definition",
+          "EU multi-region data architecture for MDR/GDPR compliance",
+          "Deployment roadmap and phasing"
+        ]
+      }
+    ],
+    "executiveSummary": {
+      "sponsorReady": "We are building a Device Intelligence Platform on Databricks that unifies your entire post-market data estate — device telemetry, QMS complaints, regulatory filings, and manufacturing records — into a governed platform that detects safety signals faster, predicts device failures before they occur, and automates regulatory reporting workflows. This platform will protect your market access, reduce field service costs by $1.5-3M annually, and demonstrate the proactive post-market surveillance that FDA and EU notified bodies increasingly expect.",
+      "thirtySecond": "Your 45,000-device fleet generates telemetry that could predict failures weeks in advance, but it's siloed from your complaint and manufacturing data. The Device Intelligence Platform unifies all post-market data sources into a Device 360 that powers predictive maintenance AI, proactive MDR signal detection, and FDA inspection-ready data governance.",
+      "twoMinute": "Today your post-market surveillance is fragmented: device telemetry in an IoT platform, complaints in a QMS, regulatory submissions in a document system, manufacturing records in MES — and no way to connect them. Your MDR reporting takes 5 days when you have 15. Your field service team schedules preventive maintenance annually regardless of actual device wear. Your ISO 13485 audit noted your signal detection approach is inadequate. The Device Intelligence Platform changes all of this. Real-time telemetry from all 45,000 devices flows into a Device 360 that links each device's operational history with its complaint record, manufacturing lot, and regulatory filing. Safety signal detection runs daily, flagging emerging complaint patterns 6-8 weeks earlier than your current manual review. Automated MDR workflow generation gives your regulatory team a draft report within 24 hours of incident confirmation — protecting your 15-day reporting deadline. The predictive maintenance AI scores every device's service risk daily, giving your field team a prioritized proactive service queue that reduces emergency calls by 25%+. Unity Catalog provides the FDA-inspection-ready data lineage from every Gold layer report back to the source QMS complaint. This is the platform that transforms reactive device management into proactive device intelligence.",
+      "successIn12Months": [
+        "Device 360 covering all 45,000 deployed devices with telemetry and complaint integration",
+        "Safety signal detection running daily with no missed MDR-reportable events",
+        "MDR reporting workflow reducing time-to-report from 5 days to 24 hours",
+        "Predictive maintenance pilot validating 65%+ PPV on lead device model",
+        "ISO 13485 PMS audit passed with improved findings on signal detection capability"
+      ]
+    },
+    "meetingChecklist": [
+      "Research the company's recent FDA inspection history and any 483 observations on PMS or complaint handling",
+      "Calculate the field service emergency call cost: average trips per year × emergency call rate × cost per emergency call",
+      "Prepare a Device 360 concept diagram showing how UDI links telemetry, complaints, and manufacturing data",
+      "Have the safety signal detection algorithm (SPC + PRR/ROR) ready to explain to the Chief Quality Officer",
+      "Prepare a GxP validation boundary diagram showing what does and does not require qualification",
+      "Know the customer's connected device connectivity profile and telemetry parameter set"
+    ],
+    "nextSteps": [
+      "Schedule a post-market surveillance data landscape assessment with the quality, regulatory, and engineering teams",
+      "Request a sample QMS complaint export and 90-day telemetry dataset from the lead device model",
+      "Engage regulatory affairs on MDR reporting process to map the current workflow and identify automation opportunities",
+      "Identify the GxP validation lead and agree on the qualification boundary for the complaint processing pipeline",
+      "Deliver a 6-week complaint trend analysis POC proposal as the first demonstration of platform value"
+    ],
+    "whiteboardTalkTrack": [
+      "Draw the current state: IoT platform, QMS, DMS, clinical database, MES — all disconnected boxes with a device in the center that none of them can see completely",
+      "Show the MDR problem: a complaint arrives, the QMS holds it, but regulatory affairs doesn't know if there are matching telemetry anomalies",
+      "Draw the lakehouse: Auto Loader and DLT collecting from all five sources into Bronze",
+      "Show the Device 360 Silver: one entity per device, with UDI as the key linking everything together",
+      "Show Gold layer: safety signal table (SPC trend line going up), predictive maintenance risk scores (device list with service priority), MDR reporting queue",
+      "Show Unity Catalog horizontally: audit trail from the MDR report back to the Bronze complaint record",
+      "Close with the business outcomes: earlier signals, fewer emergency calls, faster MDR reporting, audit-ready governance"
+    ],
+    "workshopPlan": [
+      "Morning Session 1 (90 min): Post-market surveillance data landscape — map all data sources, formats, lag times, and quality issues across telemetry, QMS, regulatory, clinical, and manufacturing",
+      "Morning Session 2 (60 min): Safety signal detection requirements — what is the current signal detection process, what would the ideal process look like, and what regulatory agency expectations must be met?",
+      "Afternoon Session 1 (90 min): Device 360 schema design — what data elements from each source must be integrated and what is the UDI resolution approach?",
+      "Afternoon Session 2 (60 min): GxP validation strategy — define the qualification boundary, responsible parties, and timeline for GxP validation",
+      "Wrap-up (30 min): POC scope, pilot device model selection, and stakeholder alignment"
+    ],
+    "objections": [
+      {
+        "objection": "Our device telemetry data is very sensitive — it's essentially PHI if connected to a patient. We can't put it in the cloud.",
+        "response": "This concern is common and valid — the architecture must be designed to handle it. The platform pseudonymizes device identifiers at ingestion, replacing device serial numbers (which could be traced to a specific patient assignment) with internal device UDIs that cannot be linked to patient identity without a separate mapping table. That mapping table is retained in a separately secured system with restricted access. Telemetry used for predictive maintenance analytics is pseudonymized. Patient-associated data for clinical analytics follows the HIPAA requirements with BAA and HITRUST certification. The EU device data stays in the EU region for MDR and GDPR compliance."
+      },
+      {
+        "objection": "We're worried that AI-generated maintenance alerts will create product liability if we act on a false positive and damage a device.",
+        "response": "The predictive maintenance model generates recommendations, not commands. Every alert is reviewed by a trained field service engineer before any action is taken. The model's recommendation is advisory — it says 'this device has elevated service risk' — and the engineer makes the actual decision to schedule service based on their professional judgment. This human-in-the-loop design is consistent with FDA guidance on AI/ML-based SaMD and limits product liability by maintaining human decision authority. All model recommendations and engineering decisions are logged in the platform for product liability defense purposes."
+      }
+    ]
+  }
+}

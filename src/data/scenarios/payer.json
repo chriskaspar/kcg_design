@@ -1,0 +1,523 @@
+{
+  "id": "payer-static",
+  "title": "Global Payer Analytics Platform",
+  "updatedAt": "2026-03-14T00:00:00.000Z",
+  "input": {
+    "scenarioTitle": "Global Payer Analytics Platform",
+    "industry": "Healthcare",
+    "customerType": "Payer",
+    "problemStatement": "A large health plan needs to modernize its analytics infrastructure to unify claims, prior authorization, eligibility, pharmacy, and social determinants data for population health management, fraud detection, and value-based care program analytics.",
+    "businessGoals": "Build a unified Member 360 for population health stratification, automate fraud waste and abuse detection, accelerate prior authorization decisions using AI, and enable value-based care contract performance measurement.",
+    "constraints": "HIPAA compliance mandatory, CMS Star Ratings reporting requirements must be met, state regulatory reporting obligations for each licensed market, and the existing mainframe-based claims system cannot be replaced.",
+    "timeline": "12-18 months for initial platform, 24 months for AI-enabled prior auth and fraud detection",
+    "currentState": "Claims processed on a 40-year-old mainframe with nightly batch exports, eligibility in a separate SQL Server database, prior auth in a Jira-based workflow system, PBM data delivered monthly by the pharmacy benefit manager, and SDOH data purchased from external vendors with no integration.",
+    "desiredFutureState": "A modern Databricks Lakehouse with unified Member 360, real-time prior auth decision support, automated fraud detection models, population health segmentation, and Star Ratings measure automation.",
+    "stakeholders": "Chief Medical Officer, VP of Population Health, Chief Actuary, VP of Operations, Compliance Officer, CFO",
+    "compliance": ["HIPAA", "HITRUST", "CMS Star Ratings", "State Regulatory Reporting"],
+    "architecturePreference": "Medallion (Bronze/Silver/Gold) on Databricks Lakehouse",
+    "outputDepth": "Comprehensive"
+  },
+  "architecture": {
+    "title": "Global Payer Analytics Platform Architecture",
+    "summary": "A HIPAA-compliant Databricks Lakehouse unifying claims, eligibility, prior authorization, pharmacy, and SDOH data into a Member 360 that powers population health management, fraud detection, and AI-assisted prior authorization.",
+    "solutionOverview": "Payer data from claims, eligibility, prior auth, PBM, and SDOH sources flows into the Databricks Lakehouse via Auto Loader for batch file ingestion and Delta Live Tables for near-real-time event streams. The Bronze layer captures raw source data with HIPAA-compliant audit history. The Silver layer integrates member identities and builds the Member 360 — a longitudinal view of coverage, claims history, pharmacy utilization, chronic conditions, and social risk factors. The Gold layer materializes analytics-ready products: population health segments, fraud risk scores, Star Ratings measures, and prior auth recommendation models. Unity Catalog governs all access with PHI controls and market-level data segregation.",
+    "assumptions": [
+      "Mainframe claims system provides nightly ANSI X12 batch exports or flat file extracts",
+      "PBM delivers pharmacy data as monthly NCPDP transaction files via SFTP",
+      "SDOH data from external vendors is available as structured files with member matching keys",
+      "The payer has or will establish a cloud environment with HIPAA BAA and HITRUST certification",
+      "A member identity matching capability (MPI or master member index) can be developed in Silver"
+    ],
+    "details": [
+      {
+        "title": "Payer Data Sources",
+        "body": "Five primary data domains: Claims Systems (medical and institutional claims from the mainframe as ANSI X12 837 batch exports); Eligibility/Enrollment (member benefit enrollment, coverage periods, and demographics); Prior Authorization (PA request data from the workflow system); Pharmacy/PBM (NCPDP prescription dispense records from the pharmacy benefit manager); and Social Determinants Data (SDOH risk indices, food insecurity flags, housing instability data from commercial vendors)."
+      },
+      {
+        "title": "Ingestion Layer",
+        "body": "Auto Loader handles high-volume nightly batch files from the mainframe and SFTP-delivered PBM and SDOH data with schema evolution. Delta Live Tables manages near-real-time prior auth events and eligibility change notifications. All ingestion events create 21 CFR-style audit records for HIPAA compliance."
+      },
+      {
+        "title": "Member 360 Silver Layer",
+        "body": "The Silver layer builds the core Member 360 entity: unified member demographics, insurance coverage history, chronic condition attribution (HCC risk coding), claims utilization summary, pharmacy adherence metrics, and SDOH risk flags. ICD-10 diagnosis codes are mapped to HCC categories for risk adjustment analytics."
+      },
+      {
+        "title": "Gold Layer Products",
+        "body": "Population health segments (high-risk, rising-risk, healthy) for care management targeting; fraud waste and abuse risk scores for claims review prioritization; CMS Star Ratings measure denominators and numerators; prior authorization recommendation scores by procedure and member risk profile; and value-based care contract performance metrics by attributed provider and network."
+      },
+      {
+        "title": "AI and Advanced Analytics",
+        "body": "The AI layer includes: a prior authorization decision support model using member history and clinical criteria; a fraud detection model using graph analytics and behavioral patterns; a population health AI assistant using Databricks Genie for non-technical users; and predictive readmission models for care management programs."
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-claims",
+        "label": "Claims Systems",
+        "iconId": "source-claims",
+        "vendor": "generic",
+        "notes": "Mainframe-based claims processing system exporting ANSI X12 837/835 batch files nightly for medical and institutional claims",
+        "x": 60,
+        "y": 80,
+        "metadata": { "group": "Payer Data Sources" }
+      },
+      {
+        "id": "n-eligibility",
+        "label": "Eligibility / Enrollment",
+        "iconId": "source-eligibility",
+        "vendor": "generic",
+        "notes": "Member eligibility and benefit enrollment database with coverage periods, plan types, and demographic information",
+        "x": 60,
+        "y": 200,
+        "metadata": { "group": "Payer Data Sources" }
+      },
+      {
+        "id": "n-priorauth",
+        "label": "Prior Authorization",
+        "iconId": "source-prior-auth",
+        "vendor": "generic",
+        "notes": "Prior authorization requests, decisions, and outcomes from the workflow management system",
+        "x": 60,
+        "y": 320,
+        "metadata": { "group": "Payer Data Sources" }
+      },
+      {
+        "id": "n-pbm",
+        "label": "Pharmacy / PBM",
+        "iconId": "source-pbm",
+        "vendor": "generic",
+        "notes": "NCPDP pharmacy transaction files from the PBM partner with prescription dispense records, drug codes, and formulary data",
+        "x": 60,
+        "y": 440,
+        "metadata": { "group": "Payer Data Sources" }
+      },
+      {
+        "id": "n-sdoh",
+        "label": "Social Determinants Data",
+        "iconId": "source-sdoh",
+        "vendor": "generic",
+        "notes": "SDOH risk indices from commercial vendors (Socify, LexisNexis) including food insecurity, housing, transportation, and social isolation scores",
+        "x": 60,
+        "y": 560,
+        "metadata": { "group": "Payer Data Sources" }
+      },
+      {
+        "id": "n-autoloader",
+        "label": "Auto Loader",
+        "iconId": "databricks-data-ingestion",
+        "vendor": "databricks",
+        "notes": "High-volume batch file ingestion for mainframe claim exports, PBM SFTP files, and SDOH vendor files with HIPAA-compliant audit logging",
+        "x": 300,
+        "y": 200,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-dlt",
+        "label": "Delta Live Tables",
+        "iconId": "databricks-dlt",
+        "vendor": "databricks",
+        "notes": "Near-real-time DLT pipelines for prior auth event streaming and eligibility change notifications with data quality enforcement",
+        "x": 300,
+        "y": 420,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-bronze",
+        "label": "Bronze Layer",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Raw payer source data in Delta format with HIPAA audit history, ingestion timestamps, and source file checksums",
+        "x": 560,
+        "y": 300,
+        "metadata": { "group": "Bronze Layer" }
+      },
+      {
+        "id": "n-silver",
+        "label": "Silver Layer (Member 360)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Unified Member 360 with demographics, coverage history, HCC risk coding, claims utilization, pharmacy adherence, and SDOH risk factors",
+        "x": 760,
+        "y": 300,
+        "metadata": { "group": "Silver Layer" }
+      },
+      {
+        "id": "n-gold",
+        "label": "Gold Layer (Payer Products)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Population health segments, fraud risk scores, CMS Star Ratings measures, prior auth recommendation scores, VBC contract performance metrics",
+        "x": 960,
+        "y": 300,
+        "metadata": { "group": "Gold Layer" }
+      },
+      {
+        "id": "n-uc",
+        "label": "Unity Catalog",
+        "iconId": "databricks-governance",
+        "vendor": "databricks",
+        "notes": "PHI column-level masking, member-level row security, HIPAA audit logs, market-level data segregation for multi-state plans",
+        "x": 760,
+        "y": 560,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-sql",
+        "label": "Databricks SQL Warehouses",
+        "iconId": "databricks-sql-warehouses",
+        "vendor": "databricks",
+        "notes": "SQL Warehouses for actuary self-service analytics, care management queries, Star Ratings reporting, and state regulatory reporting",
+        "x": 1160,
+        "y": 160,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-bi",
+        "label": "Population Health Dashboard",
+        "iconId": "databricks-dashboards",
+        "vendor": "databricks",
+        "notes": "Population health stratification, care gap tracking, VBC contract performance, and Star Ratings measure dashboards",
+        "x": 1320,
+        "y": 200,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-fraud",
+        "label": "Fraud Detection Models",
+        "iconId": "databricks-models",
+        "vendor": "databricks",
+        "notes": "MLflow-managed fraud waste and abuse detection models using claims pattern analysis, provider network graphs, and behavioral anomaly detection",
+        "x": 1240,
+        "y": 420,
+        "metadata": { "group": "Analytics & AI" }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n-claims", "target": "n-autoloader", "label": "X12 837/835 batch files", "protocol": "SFTP" },
+      { "id": "e2", "source": "n-eligibility", "target": "n-dlt", "label": "Eligibility change events", "protocol": "API" },
+      { "id": "e3", "source": "n-priorauth", "target": "n-dlt", "label": "PA request/decision stream", "protocol": "REST" },
+      { "id": "e4", "source": "n-pbm", "target": "n-autoloader", "label": "NCPDP pharmacy files", "protocol": "SFTP" },
+      { "id": "e5", "source": "n-sdoh", "target": "n-autoloader", "label": "SDOH vendor files", "protocol": "SFTP" },
+      { "id": "e6", "source": "n-autoloader", "target": "n-bronze", "label": "Raw Delta write with audit", "protocol": "Delta" },
+      { "id": "e7", "source": "n-dlt", "target": "n-bronze", "label": "Validated Delta write", "protocol": "Delta" },
+      { "id": "e8", "source": "n-bronze", "target": "n-silver", "label": "Member 360 integration", "protocol": "Spark" },
+      { "id": "e9", "source": "n-silver", "target": "n-gold", "label": "Population analytics", "protocol": "Spark" },
+      { "id": "e10", "source": "n-silver", "target": "n-uc", "label": "PHI governance registration", "protocol": "Unity Catalog" },
+      { "id": "e11", "source": "n-gold", "target": "n-uc", "label": "Product registration", "protocol": "Unity Catalog" },
+      { "id": "e12", "source": "n-gold", "target": "n-sql", "label": "SQL query access", "protocol": "SQL" },
+      { "id": "e13", "source": "n-sql", "target": "n-bi", "label": "Dashboard queries", "protocol": "SQL" },
+      { "id": "e14", "source": "n-gold", "target": "n-fraud", "label": "Claims feature vectors", "protocol": "MLflow" },
+      { "id": "e15", "source": "n-uc", "target": "n-fraud", "label": "Governed feature access", "protocol": "Unity Catalog" }
+    ],
+    "refinements": [
+      "Add a real-time prior authorization AI model serving endpoint for embedded PA decision support in the workflow system",
+      "Build a member communication platform integration that triggers care gap outreach based on Gold layer population segments",
+      "Implement provider network graph analytics using GraphX for fraud network detection",
+      "Add CMS HEDIS measure automation with automated NCQA submission file generation",
+      "Integrate with state Medicaid data exchanges for dual-eligible member management"
+    ]
+  },
+  "architectAnswers": {
+    "why_w1": "The health plan processes over 2 million claims per month through a 40-year-old mainframe system. While the mainframe reliably processes claims, it provides no analytics capability — every analysis requires a nightly batch export and a complex ETL process that takes 3-5 days to produce population-level insights. Care managers cannot identify high-risk members in time to intervene before a hospitalization occurs.",
+    "why_w2": "CMS Star Ratings directly impact the health plan's revenue: a one-star improvement translates to approximately $50M in quality bonus payments. Achieving that improvement requires precise measurement of care gap closure rates, medication adherence, and preventive care completion — analytics that today require months of manual data extraction and analysis.",
+    "why_w3": "Fraud, waste, and abuse cost the health plan an estimated $35-50M annually based on industry benchmarks. The current fraud detection process relies on retrospective claims audits performed quarterly by a 10-person team — too slow to prevent payment of fraudulent claims. Real-time fraud models could prevent payment rather than requiring costly recovery efforts.",
+    "why_h1": "Prior authorization denials generate 40,000+ member appeals annually, each requiring manual clinical review. Approximately 30% of denials are ultimately overturned on appeal. An AI-assisted PA decision support system that applies clinical criteria consistently and identifies members likely to meet criteria would reduce inappropriate denials, lower appeal volume, and reduce administrative cost.",
+    "why_h2": "Value-based care contracts with provider networks are growing — currently 25% of the plan's commercial book is in VBC arrangements. Measuring and reporting provider performance under these contracts requires integrating claims, pharmacy, lab, and SDOH data at the member level, a capability the current data infrastructure cannot support.",
+    "why_h3": "The pharmacy benefit manager delivers data monthly with a 30-day lag, making medication adherence monitoring impossible in real time. Members with diabetes or heart disease who stop filling their prescriptions should trigger a care manager outreach within days — not a month later when the data arrives.",
+    "goal_g1": "The primary goal is a Member 360 in Silver that integrates medical claims, pharmacy dispense records, eligibility, and SDOH data for every member, with HCC risk coding and chronic condition attribution, enabling population health stratification and targeted care management intervention within 48 hours of new claims data.",
+    "goal_g2": "A secondary goal is automating the production of all CMS Star Ratings measures directly from Gold layer data products, eliminating the 6-month manual preparation process and enabling ongoing real-time measurement that allows care managers to intervene before the annual measurement period closes.",
+    "goal_o1": "Care management operational success: care managers access a daily-refreshed high-risk member list from the Gold layer population health segments, with care gaps, chronic conditions, recent hospitalizations, and SDOH risk factors in a single view, enabling them to prioritize their outreach queue without manual research.",
+    "goal_o2": "Fraud detection operational success: the fraud analytics team receives a daily priority queue of suspect claims with ML-generated risk scores and supporting evidence (peer comparison, billing pattern anomalies), enabling them to focus manual review on the highest-risk claims and pre-payment suspend automated high-confidence fraud cases.",
+    "goal_a1": "The platform must support 500+ concurrent SQL users — actuaries, care managers, compliance analysts, and executives — with query performance on the full claims history (5 years, 120M+ claims) completing within 15 seconds for standard population queries using SQL Warehouses with photon acceleration.",
+    "goal_a2": "The prior auth AI model must serve real-time decisions within 2 seconds for integration with the PA workflow system, using a Databricks Model Serving endpoint with p99 latency under 2 seconds and 99.9% uptime SLA.",
+    "goal_l1": "Multi-state operations require market-level data segregation: plans licensed in State A cannot access member-identifiable data from State B without explicit cross-market authorization. Unity Catalog row-level security enforces this segregation with market codes as the security predicate.",
+    "goal_l2": "HIPAA minimum necessary access controls: care managers see their assigned panel members only; actuaries see de-identified aggregate data; fraud analysts see claims without certain PHI fields; executives see summary dashboards without individual member data. All access is role-based and enforced in Unity Catalog.",
+    "safe_s1": "PHI security requirements: all member data encrypted at rest (AES-256) and in transit (TLS 1.2+). Databricks workspace deployed in VPC with no public IPs. All data access through private endpoints with network security groups. BAA signed with Databricks and cloud provider. HITRUST certification required for cloud environment.",
+    "safe_s2": "De-identified data products are available in a separate Unity Catalog catalog for actuarial modeling, population analytics, and vendor data sharing. De-identification applies HIPAA Safe Harbor (removal of 18 PHI identifiers) validated by a statistical expert. The de-identification pipeline is documented and auditable.",
+    "safe_a1": "Fraud analyst access to sensitive member data follows a break-glass protocol: analysts request access for a specific investigation, access is approved by their manager, granted for a 24-hour window, and all access during the window is logged. After 24 hours, access reverts to baseline. This supports fraud investigation without creating broad PHI exposure.",
+    "safe_a2": "The fraud detection model is monitored for algorithmic fairness: the model's denial recommendation rate is measured by race, ethnicity, and disability status using de-identified proxies. Monthly fairness reports are reviewed by the CMO to ensure the AI is not introducing disparate impact in prior auth or fraud detection decisions.",
+    "safe_f1": "ANSI X12 claim file integrity is validated at ingestion: EDI envelope checksums are verified, claim count balancing confirms no records were lost in transmission, and financial totals are reconciled against the mainframe's settlement totals. Any discrepancy triggers an alert and halts processing until the source issue is resolved.",
+    "safe_e1": "The claims analytics platform has a 4-hour RTO and 15-minute RPO, reflecting the importance of daily claims analytics for care management operations. Delta Lake transaction logs are replicated cross-region. The mainframe nightly extract is retained in Bronze for 7 years per HIPAA and CMS record retention requirements.",
+    "safe_e2": "The prior auth decision support model has a dedicated failover path: if the Databricks Model Serving endpoint is unavailable, the PA workflow system falls back to standard clinical criteria review without AI assistance. The AI model augments but never gates the PA process, ensuring availability of the clinical workflow.",
+    "flow_f1": "Claims data flows: Mainframe nightly export → SFTP → Auto Loader → Bronze (raw X12) → Silver (adjudicated claim lines, HCC-coded diagnoses, member 360 update) → Gold (population segments, fraud feature vectors, Star Ratings measures) → SQL Warehouses and fraud model serving.",
+    "flow_l1": "The most time-sensitive flow is eligibility changes — a member who terminates coverage must be reflected in the Member 360 within 4 hours to prevent incorrect claims payments. DLT pipelines process eligibility change events from the enrollment system every 30 minutes with automated reconciliation against the Silver member table.",
+    "flow_o1": "Data quality checkpoints: X12 837 structural validation in Auto Loader; medical coding validation (valid ICD-10, CPT, NPI codes) in DLT Bronze ingestion expectations; claims-to-eligibility consistency check in Silver (claims must have a valid coverage period); and Gold layer reconciliation totals validated against mainframe financial summaries.",
+    "flow_w1": "Databricks Workflows orchestrates: nightly mainframe claim load → Bronze processing → Silver Member 360 update → Gold product refresh → care management dashboard refresh (morning) → fraud model scoring run → actuary reporting refresh (weekly). SLA monitoring alerts the data engineering team if any job exceeds its SLA window.",
+    "data_d1": "Core data domains: Medical Claims (header and line level with ICD-10 diagnoses, CPT/HCPCS procedures, rendering providers, place of service, and financial amounts); Pharmacy (NCPDP dispense records with NDC drug codes, days supply, fill dates, prescribing provider); Eligibility (member coverage periods, plan code, benefit design, demographics); Prior Authorization (procedure, diagnosing provider, requested units, determination, effective dates); SDOH (food insecurity index, housing stability, transportation access, social isolation scores by member address).",
+    "data_d2": "Risk adjustment data is a critical secondary domain: HCC (Hierarchical Condition Category) codes are derived from ICD-10 diagnosis codes in the claims domain using CMS HCC mapping tables. HCC risk scores drive capitation payments, VBC contract benchmarks, and care management prioritization. Accurate HCC coding directly impacts the plan's revenue under Medicare Advantage and ACA risk adjustment programs.",
+    "data_a1": "Claims data quality challenges: upcoding (higher-acuity codes than clinical documentation supports), unbundling (separately billing procedure components that should be billed together), and place-of-service errors are common data quality issues that affect both cost analytics and fraud detection. The Silver layer applies clinical coding audit rules to flag potentially miscoded claims for review.",
+    "data_a2": "SDOH data quality varies significantly by vendor and geography: urban markets have higher SDOH data completeness (70-80% of members have SDOH scores) while rural markets may have 30-40% completeness. Analytics using SDOH must account for this incompleteness. The Member 360 includes an SDOH data completeness flag to prevent rural member misclassification.",
+    "data_t1": "ICD-10-CM is the primary medical coding standard for diagnosis data. CPT-4 and HCPCS Level II are used for procedure coding. NDC drug codes are mapped to RxNorm and ATC therapeutic class for pharmacy analytics. NPI provider numbers are enriched with NPPES registry data (specialty, address, group affiliation) for network analytics and fraud detection.",
+    "data_t2": "The Member 360 Silver schema is designed around a member-month grain — one record per member per month — that supports efficient longitudinal analytics, risk scoring, and cohort analysis. This grain is chosen because most payer analytics (PMPM cost analysis, adherence tracking, care gap measurement) are naturally month-based. Point-in-time queries reconstruct the member's state as of any given date using Delta Lake time travel.",
+    "data_a3": "CMS requires 10 years of claims data retention for Medicare Advantage plans, and state Medicaid requirements range from 7-10 years. The Bronze layer retains all claims data indefinitely in Delta format. Silver and Gold layer data is retained for 5 years with automated data lifecycle management archiving older records to cold storage with query capability.",
+    "data_a4": "Data lineage in Unity Catalog enables regulatory audit capability: when a state regulator questions a specific HEDIS measure calculation, the audit trail from the Gold HEDIS table through Silver Member 360 to Bronze raw claims provides complete data provenance. This lineage is queryable through the Unity Catalog data lineage API.",
+    "fast_f1": "The fastest path to value is the high-risk member identification dashboard for care managers. Using only claims and eligibility data (the two highest-quality, highest-completeness sources), a risk stratification model using HCC codes and hospitalization history can be deployed in 8-10 weeks, giving care managers a daily-refreshed priority queue for outreach.",
+    "fast_f2": "CMS Star Ratings automation for medication adherence measures (PDC for diabetes medications, statins, RAS antagonists) is a high-ROI quick win. Pharmacy data from the PBM plus eligibility data enables automated PDC calculation — a measure that currently takes 3 months of manual calculation — within 6 weeks of PBM data ingestion.",
+    "fast_a1": "The 16-week rapid deployment plan: Weeks 1-4 cover infrastructure, Unity Catalog PHI governance model, and Auto Loader for claims and eligibility (the two highest-volume, highest-priority sources). Weeks 5-8 deliver Bronze ingestion for all sources and Silver Member 360. Weeks 9-12 deliver Gold population health segments and care management dashboard. Weeks 13-16 add fraud feature vectors and Star Ratings measures.",
+    "fast_a2": "Start with one market (the largest commercial book) to prove the architecture before rolling to Medicare Advantage and Medicaid markets. Each market has different regulatory requirements and data characteristics, and piloting with one market reduces initial risk while delivering immediate care management value.",
+    "fast_s1": "90-day quick wins: (1) Daily high-risk member list for care managers replacing weekly manual report; (2) Real-time eligibility discrepancy alerts for claims payment accuracy; (3) Pharmacy adherence dashboard for diabetes disease management program; (4) Top 20 suspected fraud provider list replacing quarterly manual audit. Each delivers operational value within the first quarter.",
+    "fast_t1": "Pre-built ANSI X12 837/835 parsers available in the Databricks partner ecosystem (Edifecs, Optum) accelerate claims ingestion development. CMS HCC mapping tables and HEDIS measure specifications are publicly available and can be implemented as reference data in Unity Catalog, accelerating Star Ratings automation development.",
+    "fast_t2": "Databricks MLflow with AutoML can produce a baseline fraud detection model using 6-18 months of historical claims data in 2-4 weeks. While this baseline model will be refined over time with feature engineering, it delivers immediate value to the fraud analytics team as a claims prioritization tool before a full custom model is built.",
+    "run_r1": "Platform operations: 4-5 data engineers for pipeline maintenance and new source onboarding; 2 data scientists for fraud and population health model maintenance; 1 platform administrator for Unity Catalog governance and compute management; 1 data quality analyst monitoring pipeline SLAs and data quality scorecards.",
+    "run_r2": "Claims processing is the highest-cost workload due to data volume — 2 million+ claims per month over 5 years of history. SQL Warehouse sizing with photon acceleration and Delta Lake Z-ordering on member and date columns optimizes query performance for the most common access patterns. Estimated annual platform cost: $600K-900K, compared to $4M+ in current data warehouse infrastructure.",
+    "run_u1": "The fraud detection model is retrained monthly using the prior 12 months of labeled claims data (confirmed fraud cases from investigations). Model performance metrics (precision, recall, AUC) are tracked in MLflow. A challenger model is validated against the champion model using A/B testing on a holdout set before promotion to production.",
+    "run_u2": "The HCC risk scoring model is updated annually to align with CMS HCC model updates (V28, V24 transition). The Silver layer maintains both model versions during the transition period, enabling the actuarial team to compare risk scores under old and new models before the effective date of the CMS model change.",
+    "run_n1": "The payer platform runs in a HIPAA-compliant cloud region with no cross-border data transfer for state-regulated Medicaid programs. Network architecture enforces that PHI never transits the public internet. Egress filtering prevents unauthorized data extraction from compute clusters. Annual HIPAA security risk assessments are conducted by the compliance team.",
+    "win_w1": "Success metrics: (1) Care gap closure rate improves by 15% through targeted outreach enabled by Member 360; (2) CMS Star Rating improves by 0.5 stars generating $25M in quality bonuses; (3) Fraud detection recoveries increase by $10M in the first year through earlier identification; (4) Prior auth processing time reduced by 40% through AI decision support.",
+    "win_i1": "5-year business case: $50M in Star Ratings quality bonuses (0.5 star improvement sustained); $40M in fraud recovery improvement; $30M in care management cost avoidance through better risk stratification; $15M in administrative cost savings from PA automation. Total 5-year value: $135M against a platform investment of $8M — 17:1 ROI.",
+    "win_n1": "The Member 360 platform becomes the foundation for next-generation payer capabilities: personalized benefit design using member risk profiles; AI-powered prior authorization that reduces turnaround time from 5 days to minutes while improving clinical consistency; direct-to-member SDOH interventions coordinated with community-based organizations; and a data-driven approach to network design that uses actual utilization patterns to optimize the provider network for quality and cost."
+  },
+  "story": {
+    "strategy": "The health plan's strategic choice was to build the Member 360 as the foundational data product, recognizing that population health management, fraud detection, and AI-powered prior auth all require the same unified member view. Rather than solving each problem with a separate system, the medallion architecture creates shared infrastructure that makes each subsequent use case faster and cheaper to build.",
+    "technology": "The platform uses Databricks Auto Loader for high-volume nightly claims batch processing from the mainframe (the mainframe itself does not need to change — only its output format), with Delta Live Tables handling real-time eligibility events. Unity Catalog enforces HIPAA compliance natively without custom tooling. The fraud detection model runs on Databricks Model Serving with hourly batch scoring, transitioning to real-time serving as the pre-payment fraud capability is built.",
+    "outcome": "Within 18 months, the platform processed 130 million claims across 5 years of history into a unified Member 360. Care management teams identified 45,000 high-risk members who had not been in an active care program — 12,000 of whom accepted care management enrollment, generating an estimated $18M in cost avoidance. Star Ratings improved by 0.5 stars, qualifying the plan for $22M in CMS quality bonus payments.",
+    "returnValue": "Year 1 measurable returns: $22M in CMS Star Rating quality bonuses; $8.5M in fraud recoveries from model-identified cases; $6M in administrative cost savings from automated reporting; $18M in projected care management cost avoidance. The platform's construction cost was $3.2M, yielding a first-year return of $54.5M — a 17:1 ROI that secured board approval for a 3-year platform expansion budget.",
+    "years": "Over 5 years, the Member 360 becomes the payer's competitive differentiation. AI-powered prior authorization reduces approval turnaround from 5 business days to 4 hours, dramatically improving member and provider experience. The SDOH integration enables the plan to partner with community-based organizations to address social risk factors — a capability that reduces hospital utilization by 8% among the highest-risk members and positions the plan as a leader in health equity analytics."
+  },
+  "playbook": {
+    "scenarioTitle": "Global Payer Analytics Platform",
+    "scenarioSummary": "A large health plan needs to modernize its analytics infrastructure by unifying claims, eligibility, pharmacy, prior auth, and SDOH data into a Member 360 on Databricks. The platform powers population health management, fraud detection, Star Ratings automation, and AI-assisted prior authorization.",
+    "businessDrivers": [
+      "CMS Star Ratings improvement worth $25-50M in quality bonuses requiring real-time measure monitoring",
+      "Fraud waste and abuse losses of $35-50M annually that faster detection could prevent",
+      "Prior auth administrative costs and member burden requiring AI-assisted decision support",
+      "Value-based care contracts requiring integrated cost and quality analytics at the member level",
+      "SDOH integration requirements from CMS and state Medicaid programs for health equity reporting"
+    ],
+    "constraints": [
+      "HIPAA compliance is non-negotiable with HITRUST certification required for the cloud environment",
+      "The mainframe claims processing system cannot be replaced — the lakehouse must work alongside it",
+      "State regulatory reporting requirements differ by market and must all be supported"
+    ],
+    "recommendedEngagementApproach": [
+      "Quantify the Star Ratings revenue opportunity specific to their current ratings and membership count",
+      "Assess the current fraud detection process and estimate the gap between detected and actual fraud",
+      "Deliver a proof of concept ingesting 90 days of claims and eligibility data to produce a risk stratification view",
+      "Present POC results with a 5-year ROI model to CMO, CFO, and VP Population Health"
+    ],
+    "confidenceRating": 88,
+    "recommendedConversationPath": [
+      "Star Ratings impact: What is their current rating and revenue impact of a 0.5-star improvement?",
+      "Fraud program: What is their current fraud recovery rate and investigation capacity?",
+      "Data landscape: How many source systems, what formats, what lag times?",
+      "Care management: How do care managers currently identify and prioritize high-risk members?",
+      "Prior auth burden: How many PA requests per month, what's the turnaround time, what's the appeal rate?"
+    ],
+    "discoveryQuestions": [
+      {
+        "category": "Population Health",
+        "question": "How does your care management team currently identify high-risk members for outreach, and what is the typical lag between a hospitalization and a care manager being assigned to that member?",
+        "whyItMatters": "The Member 360 value is directly measured by the reduction in time-to-identification for high-risk members. Current lag time quantifies the opportunity.",
+        "goodSignal": "Care managers work from manually curated lists prepared weekly by the analytics team — a clear automation opportunity.",
+        "redFlag": "Already using a sophisticated real-time risk stratification tool — the lakehouse value proposition shifts from care management to fraud and Star Ratings."
+      },
+      {
+        "category": "Star Ratings",
+        "question": "Which specific Star Ratings measures are your biggest gaps relative to your peer plans, and what data limitations prevent you from actively managing those measures today?",
+        "whyItMatters": "Specific measure gaps translate directly to targeted Gold layer data product requirements and quantify the ROI of the analytics investment.",
+        "goodSignal": "Medication adherence measures (diabetes, statins, blood pressure) are the biggest gaps — these are highly automatable from pharmacy data.",
+        "redFlag": "CAHPS survey-based measures are the biggest gaps — these are not addressable through claims analytics and require a different intervention strategy."
+      },
+      {
+        "category": "Fraud Detection",
+        "question": "What is your current pre-payment vs post-payment fraud detection split, and what percentage of claims are reviewed for fraud before payment?",
+        "whyItMatters": "Post-payment fraud recovery costs $0.30-0.50 for every $1 recovered. Pre-payment prevention is far more efficient. The current split determines the ROI of a real-time fraud model.",
+        "goodSignal": "Mostly post-payment retrospective audit — a pre-payment model would be a significant capability step-up with clear ROI.",
+        "redFlag": "Already have a real-time fraud system — integration complexity increases and the use case becomes enhancement rather than greenfield build."
+      },
+      {
+        "category": "Data Infrastructure",
+        "question": "What is the current lag time from a claim being adjudicated in the mainframe to it being available for analytics, and what are the biggest data quality issues in your claims data?",
+        "whyItMatters": "Lag time determines how real-time the Member 360 can be. Data quality issues — late-coded claims, coordination of benefits errors — affect model accuracy.",
+        "goodSignal": "24-48 hour lag with nightly batch files — addressable with Auto Loader. Data quality issues are known and documented.",
+        "redFlag": "5-7 day lag due to complex mainframe batch process — significant upstream work required before analytics value is achievable."
+      },
+      {
+        "category": "Compliance",
+        "question": "How many state markets do you operate in, and do any markets have data residency requirements that restrict where member data can be stored?",
+        "whyItMatters": "State data residency requirements can constrain cloud region choices and require market-level data segregation in Unity Catalog, significantly affecting architecture complexity.",
+        "goodSignal": "Single cloud region acceptable across all markets with standard HIPAA compliance requirements.",
+        "redFlag": "State-specific residency requirements for Medicaid data requiring data to remain within state boundaries — complex multi-region architecture required."
+      }
+    ],
+    "problemFraming": {
+      "statement": "A large health plan cannot optimize its care management, Star Ratings performance, or fraud detection programs because member data is fragmented across a mainframe claims system, separate eligibility database, external PBM, and unintegrated SDOH vendor data — with no unified Member 360 to power analytics, AI models, or real-time intervention.",
+      "desiredOutcomes": [
+        "A unified Member 360 available to care managers within 48 hours of new claims data",
+        "CMS Star Ratings measures calculated daily from live data rather than annually during measurement period",
+        "Real-time fraud risk scoring on every claim before payment, reducing fraud losses by $10M+ annually",
+        "AI-assisted prior authorization reducing review time from 5 days to under 4 hours for routine requests",
+        "SDOH-integrated population health segmentation enabling targeted social intervention programs"
+      ],
+      "assumptions": [
+        "Mainframe provides reliable nightly batch file extracts in standard formats",
+        "PBM data can be contracted for daily delivery instead of monthly",
+        "Cloud deployment in a HIPAA-compliant region is acceptable to compliance leadership",
+        "Care management teams are willing to adopt a new member prioritization workflow"
+      ],
+      "nonNegotiables": [
+        "HIPAA compliance with full PHI encryption and audit logging",
+        "Market-level data segregation for multi-state regulatory compliance",
+        "Mainframe claims system remains the system of record — lakehouse is analytics only"
+      ],
+      "unknowns": [
+        "State-specific Medicaid data residency requirements",
+        "PBM contract flexibility for increased data delivery frequency",
+        "Organizational readiness for AI-assisted prior auth — clinical and compliance acceptance"
+      ],
+      "framingStatement": "By building a unified Member 360 on Databricks with population health analytics, automated fraud detection, and AI-powered prior auth, the health plan can improve Star Ratings, reduce fraud losses, and deliver better care to members — generating $135M in measurable value over 5 years against an $8M platform investment."
+    },
+    "architectureOptions": [
+      {
+        "name": "Databricks Member 360 Lakehouse",
+        "summary": "A full medallion architecture with Member 360 in Silver, AI-powered analytics in Gold, and model serving for prior auth and fraud — the recommended approach for a payer of this scale.",
+        "whenToUse": [
+          "Multiple source systems across claims, pharmacy, eligibility, and SDOH",
+          "Population health analytics requiring longitudinal member views",
+          "HIPAA PHI governance requirements with market-level access controls",
+          "AI use cases including fraud detection and prior auth support requiring ML model operationalization"
+        ],
+        "benefits": [
+          "Member 360 becomes shared infrastructure across population health, fraud, and Star Ratings use cases",
+          "Unity Catalog PHI controls and HIPAA audit logs eliminate custom compliance tooling",
+          "MLflow model registry and Model Serving enable production AI deployment without a separate ML platform",
+          "SQL Warehouses provide familiar SQL access for actuaries and analysts without Spark expertise"
+        ],
+        "tradeoffs": [
+          "Higher initial investment compared to a narrowly scoped claims warehouse",
+          "Requires HIPAA BAA with Databricks and cloud provider",
+          "Real-time pre-payment fraud requires Model Serving with strict latency SLAs"
+        ],
+        "idealMaturityLevel": "Intermediate",
+        "platformMapping": [
+          "Auto Loader → mainframe claim batch files, PBM SFTP, SDOH vendor files",
+          "Delta Live Tables → eligibility events, prior auth streams",
+          "Unity Catalog → PHI masking, market RBAC, HIPAA audit logs",
+          "MLflow → fraud model, population health risk model, prior auth recommendation model",
+          "SQL Warehouses → actuary analytics, Star Ratings reporting, care management queries"
+        ],
+        "components": [
+          { "layer": "Ingestion", "items": ["Auto Loader (X12 claims, NCPDP pharmacy, SDOH files)", "DLT (eligibility events, prior auth stream)", "X12 EDI parser"] },
+          { "layer": "Silver", "items": ["Member 360 (demographics, coverage, HCC codes)", "Claims history (member-month grain)", "Pharmacy adherence metrics", "SDOH risk flags"] },
+          { "layer": "Gold", "items": ["Population health segments", "Star Ratings measure tables", "Fraud risk feature vectors", "Prior auth recommendation scores", "VBC contract performance metrics"] },
+          { "layer": "AI/ML", "items": ["Fraud detection model (MLflow)", "Population risk model (MLflow)", "Prior auth AI assistant (Model Serving)", "Fairness monitoring"] }
+        ],
+        "talkTrack": [
+          "The Member 360 is the foundation for every analytics use case — we build it once and it powers population health, fraud, Star Ratings, and prior auth simultaneously.",
+          "Unity Catalog's PHI masking means your actuaries see the data they need, your care managers see only their panel, and your compliance team sees complete audit logs — all enforced automatically.",
+          "The fraud detection model uses the same Gold layer features as your population health model — investing in data quality and enrichment compounds across both use cases."
+        ]
+      }
+    ],
+    "mockInterview": [],
+    "customerQuestions": [
+      {
+        "question": "Can Databricks handle the scale of our claims data — 2 million claims per month over 5 years?",
+        "bestAnswer": "Absolutely. At 120 million total claims with an average of 5-10 lines per claim, you are looking at 600M-1.2B records — a common scale for Databricks customers. Delta Lake with Z-ordering on member ID and service date provides sub-second query performance for individual member lookups and sub-30-second performance for population-level analyses. The Databricks Photon engine is specifically optimized for this type of analytical workload.",
+        "notes": "Bring specific performance benchmarks from comparable payer installations if available. The customer is likely comparing to Snowflake or Redshift — Photon performance data is compelling.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      },
+      {
+        "question": "How do we ensure HIPAA compliance when our PHI is in the cloud?",
+        "bestAnswer": "Databricks signs a Business Associate Agreement and is HITRUST CSF certified. Unity Catalog provides column-level masking for all PHI fields and row-level security for market and panel-based access controls. All data access is logged for HIPAA audit purposes. The workspace is deployed in your VPC with no public IPs, private endpoints for all traffic, and your encryption keys managed through your key management service. Many of the largest health plans in the US operate on Databricks with this architecture.",
+        "notes": "Lead with the BAA and HITRUST certification. Name drop other payer customers if permission to disclose. Offer a HIPAA Technical Safeguards mapping document.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      }
+    ],
+    "risks": [
+      {
+        "title": "Mainframe Batch Extract Reliability",
+        "description": "The nightly mainframe batch extract is a critical dependency. Mainframe job failures or format changes can halt the entire claims analytics pipeline, affecting care management and fraud detection operations.",
+        "likelihood": "Medium",
+        "impact": "High",
+        "mitigation": "Implement Auto Loader with file arrival monitoring and alerting. Establish a data SLA agreement with the mainframe operations team. Build reconciliation checks that compare Bronze claim counts against mainframe totals and alert on discrepancies. Maintain a 7-day lookback buffer to enable catch-up processing after mainframe outages."
+      },
+      {
+        "title": "PBM Data Lag for Real-Time Adherence Monitoring",
+        "description": "Monthly PBM data delivery prevents real-time medication adherence monitoring for care management. Members who stop filling prescriptions cannot be identified for 30 days.",
+        "likelihood": "High",
+        "impact": "Medium",
+        "mitigation": "Include daily PBM data delivery as a contract requirement in the next PBM contract renewal. In the interim, supplement monthly PBM data with pharmacy claims submitted to the health plan (available in the existing claims data) for a more timely but incomplete view of pharmacy adherence."
+      },
+      {
+        "title": "Fraud Model Fairness and Regulatory Risk",
+        "description": "An ML-based fraud model that produces disparate denial recommendations by race, ethnicity, or disability status creates regulatory and legal risk under health equity requirements.",
+        "likelihood": "Medium",
+        "impact": "High",
+        "mitigation": "Build fairness monitoring into the fraud model MLflow pipeline from day one. Monthly fairness reports reviewed by the CMO and compliance team. Use individual-level behavioral patterns (billing anomalies relative to peer providers) rather than member demographic features in the fraud model to reduce disparate impact risk."
+      }
+    ],
+    "deliverables": [
+      {
+        "name": "Payer Analytics Platform Architecture Blueprint",
+        "purpose": "Comprehensive technical design for the Member 360 Databricks Lakehouse including claims ingestion, Member 360 schema, Unity Catalog HIPAA governance model, and AI model operationalization.",
+        "outline": [
+          "Executive summary and Star Ratings/fraud ROI model",
+          "Payer data landscape assessment",
+          "Ingestion architecture (mainframe batch, PBM SFTP, DLT streams)",
+          "Member 360 Silver layer schema design",
+          "Gold layer product design (population health, fraud, Star Ratings, prior auth)",
+          "Unity Catalog PHI governance model",
+          "MLflow fraud and population health model architecture",
+          "Model Serving prior auth endpoint design",
+          "Deployment roadmap and phasing"
+        ]
+      }
+    ],
+    "executiveSummary": {
+      "sponsorReady": "We are building a unified Member 360 on Databricks that connects all your member data sources into a single HIPAA-compliant analytics platform. This platform will improve your CMS Star Ratings, detect and prevent fraud faster, power AI-assisted prior authorization, and give your care managers a real-time view of every high-risk member — generating $135M in value over 5 years against an $8M investment.",
+      "thirtySecond": "Your member data is fragmented across a mainframe, eligibility system, PBM, and unconnected SDOH data — making real-time population health, fraud detection, and Star Ratings management impossible. The Databricks Member 360 unifies all of it under a HIPAA-compliant governance layer and turns member data into your biggest competitive asset.",
+      "twoMinute": "Today your care managers identify high-risk members from a weekly spreadsheet, your fraud team does quarterly retrospective audits, and your Star Ratings team scrambles every fall to calculate measures from data they've been unable to monitor all year. Your mainframe processes claims reliably but generates no analytics insight. The Member 360 Databricks Lakehouse changes all of this. We ingest every claim, eligibility event, prescription, and SDOH data point into a unified member record available within 48 hours. Your care managers get a daily-refreshed priority queue of high-risk members with care gaps, recent hospitalizations, and social risk factors in one view. Your fraud team gets a daily scored queue of suspect claims before payment. Your Star Ratings team monitors measures in real time all year. Your prior auth team gets AI-powered decision support reducing routine PA decisions from 5 days to 4 hours. Unity Catalog ensures HIPAA compliance without custom tooling. This is the infrastructure that separates the leading payers from those being consolidated.",
+      "successIn12Months": [
+        "Member 360 available for all commercial and Medicare Advantage members",
+        "Care management team using daily ML-driven priority queue replacing weekly manual report",
+        "First fraud model deployed with $5M+ in pre-payment prevention documented",
+        "Star Ratings medication adherence measures automated with real-time monitoring",
+        "Initial prior auth AI pilot for top 10 procedure types by volume"
+      ]
+    },
+    "meetingChecklist": [
+      "Know the current CMS Star Rating and calculate revenue impact of a 0.5-star improvement for their membership count",
+      "Research their fraud investigation team size and current recovery rate to quantify the gap",
+      "Prepare a Member 360 demo using synthetic claims and pharmacy data",
+      "Have the Unity Catalog HIPAA PHI masking and row-level security demo ready",
+      "Bring case studies from comparable payer Databricks implementations",
+      "Know who owns the mainframe and whether the IT team managing it will be a blocker or collaborator"
+    ],
+    "nextSteps": [
+      "Schedule a claims data landscape assessment with the IT and analytics teams",
+      "Request a sample 90-day claims extract for POC development (de-identified)",
+      "Identify the Star Ratings VP and fraud team lead as co-champions for the POC",
+      "Deliver a 6-week POC proposal with Member 360 risk stratification output as the deliverable",
+      "Schedule a HIPAA compliance review with the Chief Compliance Officer"
+    ],
+    "whiteboardTalkTrack": [
+      "Draw the current state: mainframe, eligibility DB, PBM, SDOH vendor — all disconnected with 24-hour to 30-day lags",
+      "Show the care manager problem: a member hospitalizes Monday, care manager finds out Friday from the weekly report",
+      "Draw the lakehouse: Auto Loader collecting all batch sources, DLT collecting real-time eligibility events",
+      "Show the Member 360 Silver layer: one record per member with everything — claims, pharmacy, eligibility, SDOH",
+      "Show Gold layer products: population segments, fraud scores, Star Ratings measures — all available daily",
+      "Show the two AI endpoints: fraud scoring model and prior auth recommendation model",
+      "Close with Unity Catalog: the PHI governance layer that makes all of this HIPAA-compliant automatically"
+    ],
+    "workshopPlan": [
+      "Morning Session 1 (90 min): Data landscape mapping — sources, formats, lag times, quality issues for claims, eligibility, PBM, SDOH",
+      "Morning Session 2 (60 min): Use case prioritization — rank population health, fraud, Star Ratings, prior auth by ROI and feasibility",
+      "Afternoon Session 1 (90 min): Member 360 schema design workshop — what data elements does each use case require?",
+      "Afternoon Session 2 (60 min): HIPAA governance requirements — PHI classification, access control matrix, audit requirements",
+      "Wrap-up (30 min): POC scope, success criteria, and stakeholder alignment"
+    ],
+    "objections": [
+      {
+        "objection": "We already have a data warehouse. Why do we need a lakehouse too?",
+        "response": "If your data warehouse handles all your claims analytics needs today, it wouldn't be positioned as a problem to solve. The lakehouse adds what data warehouses typically lack: support for unstructured data and AI models, native streaming for real-time eligibility, an open format (Delta) that doesn't lock you into vendor SQL, and a purpose-built ML platform for fraud and population health models. The two systems can coexist — the lakehouse adds capabilities the warehouse doesn't have."
+      },
+      {
+        "objection": "Our compliance team will never approve storing PHI in the cloud.",
+        "response": "This concern is increasingly common, and increasingly, health plans are working through it. Databricks has signed BAAs with the largest health plans and insurers in the US. The HITRUST certification, column-level PHI masking, private endpoints, and VPC deployment provide controls that often exceed on-premises environments. We recommend scheduling a Databricks security review with your CISO — they have dedicated healthcare compliance engineers who can address specific concerns from your compliance team."
+      }
+    ]
+  }
+}

@@ -1,0 +1,544 @@
+{
+  "id": "health-system-static",
+  "title": "Health System Data Lakehouse",
+  "updatedAt": "2026-03-14T00:00:00.000Z",
+  "input": {
+    "scenarioTitle": "Health System Data Lakehouse",
+    "industry": "Healthcare",
+    "customerType": "Health System",
+    "problemStatement": "Fragmented EHR, HL7 feeds, claims, lab, and imaging metadata across 12 hospitals with no unified patient view, making care coordination, population health, and clinical AI impossible.",
+    "businessGoals": "Achieve a unified Patient 360 view across all facilities, enable real-time clinical decision support, reduce readmissions through predictive analytics, and accelerate quality reporting.",
+    "constraints": "HIPAA compliance is mandatory, legacy HL7 v2 interfaces must be supported, IT resources are limited, and data must remain on-premises or in a HITRUST-certified cloud environment.",
+    "timeline": "12-18 months for initial platform, 24 months for full AI capability",
+    "currentState": "Siloed Epic and Cerner EHR instances, point-to-point HL7 interfaces, claims data in a separate data warehouse, lab results in a LIMS, imaging metadata in PACS — no shared analytics layer.",
+    "desiredFutureState": "A governed, medallion-architecture lakehouse on Databricks with unified patient identities, real-time streaming from ADT and HL7 feeds, and AI-powered clinical insights available to clinicians.",
+    "stakeholders": "CMIO, CIO, VP of Analytics, Clinical Informatics team, Compliance Officer, CFO",
+    "compliance": ["HIPAA", "HITRUST", "ONC Cures Act"],
+    "architecturePreference": "Medallion (Bronze/Silver/Gold) on Databricks Lakehouse",
+    "outputDepth": "Comprehensive"
+  },
+  "architecture": {
+    "title": "Health System Data Lakehouse Architecture",
+    "summary": "A medallion-architecture lakehouse unifying EHR, HL7, claims, lab, and imaging metadata from 12 hospitals into a governed Patient 360 platform with AI-powered clinical insights.",
+    "solutionOverview": "Patient data flows from EHR systems, HL7 message feeds, claims systems, lab/LIMS, and imaging PACS into a Databricks Lakehouse via Auto Loader and Delta Live Tables. The Bronze layer captures raw ingested data with full audit history. The Silver layer resolves patient identities across facilities using master patient index logic, producing a canonical Patient 360 entity. The Gold layer materializes clinical data products — risk scores, quality measures, readmission predictions — consumed by SQL Warehouses, BI dashboards, and a Clinical AI Assistant powered by Databricks AI Gateway.",
+    "assumptions": [
+      "HL7 v2 interfaces are available via an existing integration engine (e.g., Mirth Connect or Azure API for FHIR)",
+      "Claims data is available as batch exports from the payer or clearinghouse",
+      "The health system has or will acquire Databricks Premium or Enterprise tier for Unity Catalog and Delta Live Tables",
+      "PHI will be handled under a signed BAA with Databricks and the cloud provider",
+      "A master patient index (MPI) solution is available or will be built using probabilistic matching in Silver"
+    ],
+    "details": [
+      {
+        "title": "Data Sources",
+        "body": "Five primary source categories feed the lakehouse: EHR/EMR systems (Epic, Cerner) via FHIR R4 and HL7 v2 ADT/ORU messages; HL7 Feeds from the integration engine; Claims Systems via batch ANSI X12 files; Lab/LIMS systems via ORU message or API export; and Imaging metadata from PACS via DICOM header extraction."
+      },
+      {
+        "title": "Ingestion Layer",
+        "body": "Auto Loader handles batch and file-based ingestion with schema inference and evolution. Delta Live Tables orchestrates streaming pipelines for real-time HL7 ADT and FHIR events, providing exactly-once processing semantics and built-in data quality expectations."
+      },
+      {
+        "title": "Medallion Layers",
+        "body": "Bronze captures raw data with minimal transformation and full lineage. Silver applies patient identity resolution, FHIR normalization, and clinical terminology mapping (SNOMED, LOINC, ICD-10). Gold materializes clinical data products including Patient Risk Scores, Care Gaps, Quality Measures (HEDIS), and Readmission Predictions."
+      },
+      {
+        "title": "Governance",
+        "body": "Unity Catalog provides row-level and column-level security for PHI, audit logs for HIPAA compliance, and data lineage across all layers. Role-based access controls separate clinical, analytics, and AI workloads."
+      },
+      {
+        "title": "Analytics & AI",
+        "body": "Databricks SQL Warehouses serve BI tools (Tableau, Power BI) and self-service analytics. The Clinical AI Assistant is built on Databricks AI Gateway with RAG over clinical notes and evidence-based guidelines, providing clinicians with real-time decision support."
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-ehr",
+        "label": "EHR / EMR",
+        "iconId": "source-ehr",
+        "vendor": "generic",
+        "notes": "Epic and Cerner EHR systems across 12 hospitals, exposing FHIR R4 APIs and HL7 v2 feeds",
+        "x": 60,
+        "y": 100,
+        "metadata": { "group": "Data Sources" }
+      },
+      {
+        "id": "n-hl7",
+        "label": "HL7 Feeds",
+        "iconId": "source-hl7",
+        "vendor": "generic",
+        "notes": "HL7 v2 ADT, ORU, and ORM messages from integration engine covering all 12 hospital facilities",
+        "x": 60,
+        "y": 220,
+        "metadata": { "group": "Data Sources" }
+      },
+      {
+        "id": "n-claims",
+        "label": "Claims Systems",
+        "iconId": "source-claims",
+        "vendor": "generic",
+        "notes": "ANSI X12 837/835 claims data from payer clearinghouses, batch-loaded nightly",
+        "x": 60,
+        "y": 340,
+        "metadata": { "group": "Data Sources" }
+      },
+      {
+        "id": "n-lab",
+        "label": "Lab / LIMS",
+        "iconId": "source-lab",
+        "vendor": "generic",
+        "notes": "Laboratory Information Management System exporting ORU results and reference ranges",
+        "x": 60,
+        "y": 460,
+        "metadata": { "group": "Data Sources" }
+      },
+      {
+        "id": "n-imaging",
+        "label": "Imaging Metadata",
+        "iconId": "source-imaging",
+        "vendor": "generic",
+        "notes": "PACS DICOM metadata extraction — study, series, and instance metadata excluding pixel data",
+        "x": 60,
+        "y": 580,
+        "metadata": { "group": "Data Sources" }
+      },
+      {
+        "id": "n-autoloader",
+        "label": "Auto Loader",
+        "iconId": "databricks-data-ingestion",
+        "vendor": "databricks",
+        "notes": "Databricks Auto Loader for incremental batch file ingestion with schema inference and evolution",
+        "x": 300,
+        "y": 200,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-dlt",
+        "label": "Delta Live Tables",
+        "iconId": "databricks-dlt",
+        "vendor": "databricks",
+        "notes": "DLT pipelines for streaming HL7/FHIR ingestion with built-in data quality expectations and lineage",
+        "x": 300,
+        "y": 420,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-bronze",
+        "label": "Bronze Layer",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Raw ingested data in Delta format with full audit history, source metadata, and ingestion timestamps",
+        "x": 560,
+        "y": 300,
+        "metadata": { "group": "Bronze Layer" }
+      },
+      {
+        "id": "n-silver",
+        "label": "Silver Layer (Patient 360)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Patient identity resolution across facilities, FHIR normalization, SNOMED/LOINC/ICD-10 mapping, unified Patient 360 entity",
+        "x": 760,
+        "y": 300,
+        "metadata": { "group": "Silver Layer" }
+      },
+      {
+        "id": "n-gold",
+        "label": "Gold Layer (Clinical Products)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Materialized clinical data products: Patient Risk Scores, Care Gaps, HEDIS Quality Measures, Readmission Predictions",
+        "x": 960,
+        "y": 300,
+        "metadata": { "group": "Gold Layer" }
+      },
+      {
+        "id": "n-uc",
+        "label": "Unity Catalog",
+        "iconId": "databricks-governance",
+        "vendor": "databricks",
+        "notes": "Centralized governance with row/column-level security for PHI, HIPAA audit logs, and end-to-end data lineage",
+        "x": 760,
+        "y": 560,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-sql",
+        "label": "Databricks SQL Warehouses",
+        "iconId": "databricks-sql-warehouses",
+        "vendor": "databricks",
+        "notes": "Serverless SQL Warehouses serving BI tools and self-service analytics with auto-scaling compute",
+        "x": 1160,
+        "y": 160,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-bi",
+        "label": "BI Dashboards",
+        "iconId": "databricks-dashboards",
+        "vendor": "databricks",
+        "notes": "Clinical operations dashboards for quality reporting, population health metrics, and executive scorecards",
+        "x": 1320,
+        "y": 160,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-ai",
+        "label": "Clinical AI Assistant",
+        "iconId": "databricks-genie",
+        "vendor": "databricks",
+        "notes": "RAG-based clinical decision support assistant grounded in patient data and evidence-based clinical guidelines",
+        "x": 1240,
+        "y": 420,
+        "metadata": { "group": "Analytics & AI" }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n-ehr", "target": "n-autoloader", "label": "FHIR R4 / batch export", "protocol": "HTTPS" },
+      { "id": "e2", "source": "n-hl7", "target": "n-dlt", "label": "HL7 v2 streaming", "protocol": "TCP/MLLP" },
+      { "id": "e3", "source": "n-claims", "target": "n-autoloader", "label": "ANSI X12 batch files", "protocol": "SFTP" },
+      { "id": "e4", "source": "n-lab", "target": "n-dlt", "label": "ORU results stream", "protocol": "HL7/FHIR" },
+      { "id": "e5", "source": "n-imaging", "target": "n-autoloader", "label": "DICOM metadata export", "protocol": "HTTPS" },
+      { "id": "e6", "source": "n-autoloader", "target": "n-bronze", "label": "Raw Delta write", "protocol": "Delta" },
+      { "id": "e7", "source": "n-dlt", "target": "n-bronze", "label": "Streaming Delta write", "protocol": "Delta" },
+      { "id": "e8", "source": "n-bronze", "target": "n-silver", "label": "Transform & normalize", "protocol": "Spark" },
+      { "id": "e9", "source": "n-silver", "target": "n-gold", "label": "Aggregate & productize", "protocol": "Spark" },
+      { "id": "e10", "source": "n-silver", "target": "n-uc", "label": "Register & govern", "protocol": "Unity Catalog" },
+      { "id": "e11", "source": "n-gold", "target": "n-uc", "label": "Register & govern", "protocol": "Unity Catalog" },
+      { "id": "e12", "source": "n-gold", "target": "n-sql", "label": "SQL query access", "protocol": "SQL" },
+      { "id": "e13", "source": "n-sql", "target": "n-bi", "label": "Dashboard queries", "protocol": "SQL" },
+      { "id": "e14", "source": "n-gold", "target": "n-ai", "label": "Clinical context", "protocol": "REST" },
+      { "id": "e15", "source": "n-uc", "target": "n-ai", "label": "Governed data access", "protocol": "Unity Catalog" }
+    ],
+    "refinements": [
+      "Add a real-time FHIR R4 server (e.g., Azure Health Data Services) as a normalized source layer before Bronze",
+      "Implement probabilistic master patient index (MPI) matching logic in Silver using ML-based entity resolution",
+      "Add streaming readmission risk scoring pipeline for real-time alerts at point of care",
+      "Build HEDIS and CMS quality measure automation using Gold layer data products",
+      "Integrate with Epic MyChart or patient portal for closed-loop care gap notifications"
+    ]
+  },
+  "architectAnswers": {
+    "why_w1": "The health system operates 12 hospitals with disparate EHR systems — Epic and Cerner — generating patient data that never converges into a unified view. Clinicians cannot see the full patient history when a patient presents at a different facility, leading to redundant testing, medication errors, and care coordination failures. This fragmentation directly impacts patient safety and clinical outcomes.",
+    "why_w2": "Quality reporting for CMS, HEDIS, and Joint Commission accreditation requires aggregating data across facilities and source systems. Today, the analytics team manually extracts and reconciles data from six different systems to produce a single quality report — a process that takes weeks and introduces significant error risk. A unified platform would automate this reporting and improve accuracy.",
+    "why_w3": "The health system's strategic plan calls for value-based care contracts with payers, which require demonstrating outcomes across populations. Without a unified data platform, risk stratification, care gap identification, and outcomes measurement are impossible at scale, leaving significant contract value on the table.",
+    "why_h1": "Clinical informaticists and data engineers spend 60-70% of their time on data extraction and reconciliation rather than analysis. The lack of standardized data models means every analytics project starts from scratch with raw data. A governed lakehouse with curated Silver and Gold layers would shift this ratio dramatically toward insight generation.",
+    "why_h2": "Patient readmissions cost the health system $15-20M annually in CMS penalties and unreimbursed care. Predictive readmission models exist in the market, but without a unified patient dataset across all 12 hospitals, they cannot be trained or deployed effectively. The lakehouse enables these models to operate at system-wide scale.",
+    "why_h3": "The current point-to-point HL7 interface landscape has over 200 individual interface connections, each requiring custom maintenance. This creates brittleness — a single interface failure can break downstream analytics for an entire facility. Centralizing ingestion through Auto Loader and DLT eliminates this fragility.",
+    "why_y1": "A unified patient view is the foundation for the health system's AI strategy. The CMIO has mandated that clinical AI tools — ambient documentation, clinical decision support, diagnostic assistance — must be grounded in the full patient record, not just the current encounter. This requires the Silver layer Patient 360 entity.",
+    "why_y2": "Regulatory pressure is intensifying: the ONC Cures Act mandates information blocking prevention and FHIR-based data sharing with patients and payers. The lakehouse provides the infrastructure to support FHIR bulk export, patient data access, and payer API compliance at scale.",
+    "why_y3": "The health system is exploring merger and acquisition activity. Each acquisition brings new EHR systems and data formats. A flexible ingestion layer built on Auto Loader and DLT can absorb new facilities rapidly without rebuilding the entire data pipeline, making M&A integration dramatically faster.",
+    "goal_g1": "The primary goal is a unified Patient 360 entity in the Silver layer that resolves patient identities across all 12 hospitals using probabilistic MPI matching, integrating EHR encounters, claims history, lab results, and imaging records into a single longitudinal patient record.",
+    "goal_g2": "A secondary goal is automating clinical quality reporting — specifically HEDIS measures, CMS quality reporting, and internal quality scorecards — directly from Gold layer data products, eliminating the current manual extraction process and reducing reporting cycle time from weeks to hours.",
+    "goal_o1": "Success for the analytics organization means a 70% reduction in time spent on data preparation. Analytics teams should be able to access curated, governed data products from the Gold layer and build new analyses in days rather than weeks, using SQL Warehouses without requiring Spark expertise.",
+    "goal_o2": "For clinical operations, success means deploying a readmission prediction model that fires alerts in the EHR workflow within 24 hours of admission, allowing case managers to intervene proactively. This model should be retrained monthly using the lakehouse Gold layer data.",
+    "goal_a1": "The architecture must support at least 5,000 concurrent SQL queries from BI tools and self-service users without performance degradation. SQL Warehouses with auto-scaling and photon acceleration will handle peak load during morning clinical review periods.",
+    "goal_a2": "HL7 ADT streaming pipelines must process events with less than 60 seconds end-to-end latency from message generation to availability in operational state tables, ensuring real-time census and patient flow visibility for hospital operations.",
+    "goal_l1": "All PHI data must be governed under Unity Catalog with column-level masking for sensitive identifiers (SSN, DOB, MRN) and row-level security restricting access to data by facility affiliation. Every data access event must be logged for HIPAA audit purposes.",
+    "goal_l2": "The platform must support role-based data access: clinical analysts see patient-level data for their facility, population health analysts see de-identified or aggregated data, and AI model training jobs access data through approved service principals with audit trails.",
+    "safe_s1": "All PHI must be encrypted at rest using AES-256 and in transit using TLS 1.2+. Databricks clusters must be deployed in a VPC/VNet with no public IP addresses, and all data access must route through private endpoints. Cloud provider must have a signed BAA and HITRUST certification.",
+    "safe_s2": "De-identification pipelines using Safe Harbor or Expert Determination methods must be available in the Gold layer for research and analytics use cases where PHI is not required. These de-identified datasets are governed separately in Unity Catalog with appropriate data classifications.",
+    "safe_a1": "Unity Catalog row-level security policies restrict data access by facility code, ensuring that a clinician or analyst from Hospital A cannot access patient records from Hospital B without explicit cross-facility authorization. Service principals for AI workloads are scoped to specific catalog and schema permissions.",
+    "safe_a2": "All Databricks clusters are configured with credential passthrough disabled and personal access tokens rotated every 90 days. Cluster policies enforce no-internet access, approved runtime versions, and mandatory autotermination after 2 hours of inactivity to prevent PHI exposure.",
+    "safe_f1": "Delta Lake ACID transactions ensure that partial writes never result in corrupt or incomplete patient records. All DLT pipelines include data quality expectations that quarantine records failing validation — missing patient identifiers, invalid date ranges, malformed HL7 segments — to a separate quarantine table with alerting.",
+    "safe_e1": "The platform is deployed across two availability zones with Delta Lake transaction logs replicated to a secondary region for disaster recovery. RTO is targeted at 4 hours and RPO at 15 minutes for the Bronze layer, which is the authoritative record of ingested source data.",
+    "safe_e2": "DLT pipeline failures trigger PagerDuty alerts with automated retry logic for transient failures. Persistent failures escalate to the data engineering on-call team. A dead-letter queue captures messages that fail after three retry attempts for manual review and reprocessing.",
+    "flow_f1": "Data flows left to right: source systems emit data through HL7 interfaces and FHIR APIs → Auto Loader and DLT ingest into Bronze → DLT transforms normalize and deduplicate in Silver → Gold layer aggregations create clinical data products → SQL Warehouses and AI assistant consume Gold data products for analytics and clinical decision support.",
+    "flow_l1": "HL7 ADT admit/discharge/transfer events are the most latency-sensitive flow, driving real-time census dashboards and patient flow analytics. These events stream through DLT with a target latency of under 60 seconds from generation to availability. Batch claims and lab data are processed nightly with T+1 availability.",
+    "flow_o1": "Data quality is enforced at multiple checkpoints: Auto Loader validates file schema on ingestion; DLT expectations enforce clinical data quality rules (valid MRN format, ICD-10 codes in reference table, LOINC codes validated against terminology server); Gold layer uses data quality monitoring notebooks to detect anomalies in key clinical metrics.",
+    "flow_w1": "Workflows are orchestrated using Databricks Workflows with dependency chains: nightly ingestion jobs run first, followed by Silver transformation, then Gold aggregation, and finally BI dashboard refresh. DLT continuous pipelines run independently for streaming workloads. All workflow runs are logged with execution metrics for SLA monitoring.",
+    "data_d1": "The primary data domains are: Patient Demographics (MPI, name, DOB, address, identifiers), Clinical Encounters (inpatient, outpatient, ED visits with diagnoses and procedures), Laboratory Results (LOINC-coded results with reference ranges and critical flags), Pharmacy/Medications (dispense records, administration records, prescription history), and Imaging Studies (DICOM metadata, study type, modality, reading physician).",
+    "data_d2": "Claims data adds financial and administrative dimensions: claim header (service dates, facility, provider), claim lines (CPT/HCPCS procedure codes, diagnosis codes, charges), adjudication data (allowed amounts, denial reasons, payment status), and member eligibility spans. Claims provide the most complete longitudinal view of care received outside the health system.",
+    "data_a1": "Data quality in source systems is highly variable. EHR data quality is generally high for structured fields but poor for free-text clinical notes. HL7 message quality varies by interface — some sending systems omit optional but important fields like patient weight or attending physician. A data quality scorecard by source system and data element will be published in the Silver layer.",
+    "data_a2": "Patient identity matching across 12 hospitals is the most complex data challenge. Probabilistic matching using a combination of demographics (name, DOB, SSN last 4, address) and clinical identifiers (MRN by facility) will be implemented. Estimated match rate is 85-90% automated with a manual review workflow for uncertain matches.",
+    "data_t1": "The Silver layer applies FHIR R4 normalization as the canonical data model for clinical entities, enabling interoperability with external payers, HIEs, and future AI models trained on FHIR-structured data. SNOMED CT, LOINC, and ICD-10-CM are used as standard terminologies with local code mapping tables maintained in Unity Catalog.",
+    "data_t2": "The Gold layer uses a dimensional model optimized for analytics: fact tables for encounters, labs, and claims joined to patient, provider, facility, and date dimensions. This star schema supports fast aggregation for population health queries across millions of patient-years of data.",
+    "data_a3": "Data retention policies must comply with state medical records laws (minimum 7-10 years depending on state) and HIPAA minimum necessary standards. The Bronze layer retains all ingested data indefinitely in cold storage. The Silver and Gold layers retain 5 years of active data with older data moved to archive storage with query capability.",
+    "data_a4": "Lineage tracking in Unity Catalog captures the end-to-end provenance of every data element from source system to Gold layer product. This supports HIPAA audit requirements and enables impact analysis when source systems change — analysts can immediately identify which downstream reports and models are affected.",
+    "fast_f1": "The fastest path to value is automated HEDIS quality reporting. The health system currently spends $500K annually on manual HEDIS abstraction and reporting. The Gold layer can produce HEDIS measure denominators and numerators directly from claims and encounter data, eliminating manual abstraction for 60-70% of measures within the first 6 months.",
+    "fast_f2": "Deploying a pre-built readmission prediction model using Databricks MLflow and the Silver layer Patient 360 data can deliver the first clinical AI use case in 90 days. This demonstrates AI value quickly while building organizational confidence in the data platform's clinical data quality.",
+    "fast_a1": "A 12-week rapid deployment approach: Weeks 1-4 focus on infrastructure provisioning, Unity Catalog setup, and ingestion pipeline development for the highest-volume source (Epic EHR). Weeks 5-8 add remaining sources and Bronze layer validation. Weeks 9-12 deliver Silver Patient 360 and first Gold layer quality measures dashboard.",
+    "fast_a2": "Start with one facility or one service line (e.g., cardiology) to prove the architecture before scaling to all 12 hospitals. This reduces initial complexity, allows the team to learn the data quality issues in one environment, and creates a reference architecture and runbook for subsequent facility rollouts.",
+    "fast_s1": "Quick wins include: (1) Automated daily patient census dashboard replacing manual spreadsheet; (2) Real-time ADT feed dashboard for hospital operations; (3) Automated quality measure reporting for top 5 HEDIS measures; (4) Lab critical value trend report for patient safety committee. Each of these can be delivered in 4-6 weeks once Bronze data is available.",
+    "fast_t1": "Databricks Terraform provider and infrastructure-as-code templates accelerate platform provisioning. Pre-built DLT templates for HL7 and FHIR ingestion (available in Databricks Solution Accelerators) reduce pipeline development time from weeks to days. Unity Catalog setup scripts for healthcare data classification can be applied on day one.",
+    "fast_t2": "The Databricks Healthcare & Life Sciences solution accelerator library includes pre-built notebooks for FHIR ingestion, patient identity resolution, HEDIS measure calculation, and readmission risk scoring. Leveraging these accelerators can reduce development effort by 40-60% compared to building from scratch.",
+    "run_r1": "The platform will be operated by a team of 3-4 data engineers and 2 platform administrators. Databricks Workflows provides job scheduling and monitoring. DLT pipelines are self-healing with automatic retry and alerting. Unity Catalog provides a central control plane for governance without requiring custom tooling.",
+    "run_r2": "Cost management is critical for health system IT budgets. Databricks SQL Warehouses with serverless auto-scaling eliminate idle compute costs. DLT pipeline compute auto-scales based on data volume. Cost allocation tags by department and use case enable chargeback reporting. Monthly cost reviews will track spend against budget.",
+    "run_u1": "Platform updates follow a blue-green deployment pattern: new DLT pipeline versions are deployed alongside existing pipelines, validated against a subset of data, and then promoted. Unity Catalog schema migrations use versioned Delta tables with backward compatibility for downstream consumers during the transition period.",
+    "run_u2": "Data SLAs are defined per data product: Bronze layer updates within 30 minutes of source availability, Silver Patient 360 updates within 2 hours, Gold quality measures updated nightly by 6:00 AM. Databricks Workflows monitors SLA compliance and sends alerts when jobs miss their SLA windows.",
+    "run_n1": "The platform runs on a cloud provider's healthcare-compliant region with HITRUST certification. Network architecture uses private endpoints for all Databricks workspace traffic. No data leaves the private network perimeter. Egress filtering is applied to prevent unauthorized data exfiltration from compute clusters.",
+    "win_w1": "The platform will be considered a success when: (1) Quality reporting cycle time drops from 3 weeks to 4 hours; (2) Readmission prediction model is live and used by case managers in daily workflow; (3) Analytics team data prep time drops from 70% to under 30% of project effort; (4) All 12 hospitals are onboarded with Patient 360 available in production.",
+    "win_i1": "Executive success metrics: $5M+ reduction in CMS readmission penalties within 18 months; $500K savings in manual HEDIS abstraction costs; 20% improvement in care gap closure rates through AI-assisted identification; Zero HIPAA violations related to data platform in first 2 years of operation.",
+    "win_n1": "The platform creates a competitive moat: health systems with unified data platforms can execute value-based care contracts that require population-level outcomes measurement. Over 3-5 years, the lakehouse becomes the foundation for AI-powered clinical programs — ambient documentation, diagnostic assistance, drug-disease interaction prediction — that attract and retain top clinical talent and differentiate the health system in its market."
+  },
+  "story": {
+    "strategy": "The health system chose a Databricks Lakehouse architecture as the strategic foundation because it eliminates the false choice between real-time streaming and batch analytics — both workloads run on the same platform with Delta Lake providing ACID guarantees across all data. The medallion architecture (Bronze/Silver/Gold) was selected because it separates concerns cleanly: raw data preservation, clinical normalization, and analytics-ready products each live in dedicated layers with clear ownership and SLAs. Unity Catalog was non-negotiable as the governance layer given HIPAA requirements and the need for cross-facility data access controls.",
+    "technology": "The platform runs on Databricks on the health system's primary cloud provider in a HITRUST-certified region. Auto Loader handles batch file ingestion for claims and lab data with schema evolution handling the inevitable source system changes. Delta Live Tables powers the real-time HL7 and FHIR streaming pipelines with built-in data quality expectations. The AI layer uses Databricks AI Gateway to provide a governed interface for LLM-powered clinical tools, ensuring that AI workloads access only authorized data through Unity Catalog service principals.",
+    "outcome": "Within 12 months, the platform processed over 50 million patient encounters across all 12 hospitals into a unified Patient 360. HEDIS quality reporting cycle time dropped from 3 weeks to 4 hours. The readmission prediction model achieved 78% AUC and is now embedded in the Epic workflow, triggering case manager reviews for high-risk patients within 24 hours of admission. Data engineering productivity increased by 65% as teams shifted from data extraction to analysis.",
+    "returnValue": "The readmission prediction program avoided an estimated $4.2M in CMS penalties in its first year by enabling proactive intervention for high-risk patients. Elimination of manual HEDIS abstraction saved $480K annually in vendor and staff costs. The self-service analytics capability, enabled by SQL Warehouses and curated Gold layer products, delivered an additional $1.8M in analyst productivity gains. Total first-year ROI exceeded $6.4M against a platform investment of $2.1M.",
+    "years": "Over 5 years, the lakehouse becomes the clinical intelligence backbone of the health system. The Patient 360 evolves to include social determinants of health, genomics data for precision medicine programs, and real-world evidence from external data consortiums. AI models are retrained continuously on the growing dataset, improving prediction accuracy year over year. The platform positions the health system to take on full-risk value-based contracts and to participate in regional health information exchange networks — capabilities that define the next generation of integrated health systems."
+  },
+  "playbook": {
+    "scenarioTitle": "Health System Data Lakehouse",
+    "scenarioSummary": "A 12-hospital health system needs to unify fragmented EHR, HL7, claims, lab, and imaging data into a governed patient data platform. The Databricks Lakehouse provides a medallion architecture delivering Patient 360, automated quality reporting, and clinical AI capabilities while maintaining HIPAA compliance.",
+    "businessDrivers": [
+      "CMS readmission penalties costing $15-20M annually that could be reduced through predictive intervention",
+      "Manual HEDIS quality reporting costing weeks of analyst time and introducing errors that risk contract penalties",
+      "Value-based care contract obligations requiring population-level outcomes measurement across all facilities",
+      "ONC Cures Act compliance mandating FHIR-based data sharing with patients and payers",
+      "Strategic AI initiatives requiring a unified, high-quality patient dataset as the foundation"
+    ],
+    "constraints": [
+      "HIPAA compliance is non-negotiable — all PHI must be governed with encryption, access controls, and audit logging",
+      "Legacy HL7 v2 interfaces must be supported alongside FHIR R4 without requiring source system changes",
+      "Health system IT budget constraints require demonstrating ROI within 12 months to secure ongoing funding"
+    ],
+    "recommendedEngagementApproach": [
+      "Begin with a data landscape assessment across all 12 hospitals to catalog source systems, interface types, data volumes, and quality issues",
+      "Facilitate a clinical-IT alignment workshop to prioritize the first three analytics use cases and define success metrics",
+      "Deliver a proof-of-concept in 4 weeks using one facility's Epic data to demonstrate Patient 360 and a quality measure calculation",
+      "Present POC results to CMIO and CIO with a phased roadmap for full deployment across all facilities"
+    ],
+    "confidenceRating": 92,
+    "recommendedConversationPath": [
+      "Current state: How many source systems, what formats, what interfaces exist today?",
+      "Pain quantification: What does the readmission penalty cost? How long does HEDIS reporting take?",
+      "Governance requirements: What are your HIPAA audit and access control requirements?",
+      "AI readiness: What clinical AI use cases are on the CMIO's roadmap?",
+      "Timeline and budget: What's the board-level mandate and approved budget?"
+    ],
+    "discoveryQuestions": [
+      {
+        "category": "Data Landscape",
+        "question": "How many distinct EHR and source systems do you have across your facilities, and what integration interfaces exist today?",
+        "whyItMatters": "The complexity of the ingestion layer scales directly with the number and type of source systems. HL7 v2 vs FHIR R4 vs proprietary APIs require different ingestion patterns.",
+        "goodSignal": "They have an integration engine (Mirth, Rhapsody) centralizing interfaces, reducing direct connections needed from the lakehouse.",
+        "redFlag": "200+ point-to-point interfaces with no central integration engine — this is a multi-year integration project before analytics can begin."
+      },
+      {
+        "category": "Clinical Use Cases",
+        "question": "Which clinical programs — readmission reduction, care management, quality reporting — are the highest priority for the CMIO and clinical operations leaders?",
+        "whyItMatters": "Clinical use cases drive the data product requirements in the Gold layer and determine which source systems must be onboarded first.",
+        "goodSignal": "CMIO has a specific list of 3-5 AI use cases with defined clinical owners and budget allocation.",
+        "redFlag": "No clinical champion — this is purely an IT-driven infrastructure project with no clinical demand. Risk of low adoption."
+      },
+      {
+        "category": "Governance & Compliance",
+        "question": "Do you currently have a master patient index (MPI) across all facilities, and how do you handle patient identity matching for cross-facility records?",
+        "whyItMatters": "Without a reliable MPI, the Patient 360 Silver layer cannot be built reliably. MPI quality is often the biggest technical risk in health system data platforms.",
+        "goodSignal": "Existing enterprise MPI (e.g., IBM/Initiate, Verato) with API access and a defined governance process for managing duplicate patients.",
+        "redFlag": "No MPI — each facility uses its own MRN with no cross-reference. Identity resolution must be built from scratch, adding 3-6 months to the project."
+      },
+      {
+        "category": "Organizational Readiness",
+        "question": "What is the current data engineering team size and skill set, and do you have experience with Spark-based data pipelines?",
+        "whyItMatters": "Databricks requires Spark and Python/SQL skills. Team readiness determines whether training investment is needed before the platform can be operationalized.",
+        "goodSignal": "Team has SQL and Python skills, has used cloud data warehouses, and has exposure to streaming data concepts.",
+        "redFlag": "Team is primarily ETL developers using legacy tools (Informatica, SSIS) with no cloud or Spark experience — significant training investment required."
+      },
+      {
+        "category": "Budget & Timeline",
+        "question": "What is the approved budget and expected payback period from the board or executive team?",
+        "whyItMatters": "Health system budgets are constrained. Understanding the budget envelope and payback expectation helps right-size the initial deployment scope.",
+        "goodSignal": "Multi-year budget commitment with a 2-year payback expectation and executive sponsorship at CFO or CEO level.",
+        "redFlag": "Project is funded from IT operating budget with a 12-month review cycle — insufficient time horizon for a platform of this scope."
+      }
+    ],
+    "problemFraming": {
+      "statement": "A 12-hospital health system cannot achieve its clinical, operational, or financial objectives because patient data is fragmented across disparate EHR systems, HL7 interfaces, claims processors, and imaging systems with no unified patient view, governed analytics layer, or AI-ready data infrastructure.",
+      "desiredOutcomes": [
+        "A unified Patient 360 entity resolving patient identities across all 12 hospitals",
+        "Automated HEDIS quality reporting with 4-hour cycle time replacing weeks of manual effort",
+        "A readmission prediction model embedded in the EHR workflow driving proactive case management",
+        "HIPAA-compliant data governance with full audit trails and role-based access controls",
+        "A self-service analytics capability enabling clinical and operational teams to answer questions independently"
+      ],
+      "assumptions": [
+        "HL7 interfaces are available from an existing integration engine",
+        "FHIR R4 APIs are available from Epic/Cerner with appropriate licensing",
+        "A cloud provider with HITRUST certification is acceptable to the compliance team",
+        "Clinical champions exist for the readmission and quality reporting use cases"
+      ],
+      "nonNegotiables": [
+        "HIPAA compliance with full PHI encryption and audit logging",
+        "Support for legacy HL7 v2 interfaces without requiring source system changes",
+        "Unity Catalog governance as the central control plane for all data access"
+      ],
+      "unknowns": [
+        "Quality and completeness of existing MPI coverage across all facilities",
+        "Depth of HL7 segment population from each sending system",
+        "Organizational appetite and readiness for AI-powered clinical decision support"
+      ],
+      "framingStatement": "By building a governed Databricks Lakehouse with medallion architecture, we can transform fragmented clinical data into a unified Patient 360 that powers automated quality reporting, predictive clinical models, and AI-assisted care management — delivering measurable ROI in 12 months while building the foundation for a decade of clinical AI innovation."
+    },
+    "architectureOptions": [
+      {
+        "name": "Databricks Medallion Lakehouse",
+        "summary": "A full medallion architecture on Databricks with Auto Loader, Delta Live Tables, Unity Catalog, and SQL Warehouses — the recommended approach for a health system of this scale.",
+        "whenToUse": [
+          "Multiple source systems with heterogeneous formats (HL7, FHIR, X12, CSV)",
+          "Real-time and batch workloads running on the same platform",
+          "HIPAA governance requirements requiring column-level security and audit logging",
+          "AI use cases requiring a large, high-quality training dataset"
+        ],
+        "benefits": [
+          "Single platform for batch and streaming eliminates the need for separate Lambda architecture",
+          "Unity Catalog provides enterprise-grade governance without custom tooling",
+          "Delta Live Tables simplifies pipeline maintenance with automatic schema evolution and data quality enforcement",
+          "SQL Warehouses provide familiar SQL interface for clinical analysts without Spark expertise"
+        ],
+        "tradeoffs": [
+          "Higher initial infrastructure and licensing cost compared to a simple data warehouse",
+          "Requires Databricks-specific skills that may need training for existing team",
+          "DLT has some limitations in custom orchestration compared to hand-coded Spark pipelines"
+        ],
+        "idealMaturityLevel": "Intermediate",
+        "platformMapping": [
+          "Auto Loader → file-based batch ingestion",
+          "Delta Live Tables → streaming and declarative pipeline management",
+          "Unity Catalog → HIPAA-compliant governance and lineage",
+          "SQL Warehouses → BI and self-service analytics",
+          "Databricks AI Gateway → governed LLM access for clinical AI"
+        ],
+        "components": [
+          { "layer": "Ingestion", "items": ["Auto Loader (batch files)", "Delta Live Tables (HL7/FHIR streaming)", "FHIR R4 API connectors"] },
+          { "layer": "Storage", "items": ["Delta Lake Bronze (raw)", "Delta Lake Silver (Patient 360)", "Delta Lake Gold (clinical products)"] },
+          { "layer": "Governance", "items": ["Unity Catalog", "Column-level masking (PHI)", "Row-level security (facility)", "Audit log export"] },
+          { "layer": "Analytics", "items": ["Databricks SQL Warehouses", "Databricks Dashboards", "Tableau/Power BI connectors"] },
+          { "layer": "AI", "items": ["MLflow (model registry)", "Databricks AI Gateway", "Clinical RAG assistant", "Readmission prediction model"] }
+        ],
+        "talkTrack": [
+          "Think of the medallion architecture as a clinical data refinement process — Bronze is the raw specimen, Silver is the processed and normalized result, and Gold is the clinically actionable data product.",
+          "Unity Catalog is your HIPAA compliance control plane — every access, every query, every transformation is logged and auditable without custom tooling.",
+          "Delta Live Tables is your pipeline operations team — it handles schema evolution, data quality enforcement, and automatic retries so your data engineers focus on clinical logic, not infrastructure."
+        ]
+      }
+    ],
+    "mockInterview": [],
+    "customerQuestions": [
+      {
+        "question": "How does Databricks ensure our PHI is protected and HIPAA compliant?",
+        "bestAnswer": "Databricks signs a Business Associate Agreement (BAA) and is HITRUST CSF certified. Unity Catalog provides column-level masking for PHI fields, row-level security for facility-based access controls, and full audit logging of all data access events. All data is encrypted at rest (AES-256) and in transit (TLS 1.2+). Clusters run in your VPC with no public IP addresses.",
+        "notes": "Lead with the BAA and HITRUST certification — these are the compliance team's primary concerns. Then describe the technical controls in plain language.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      },
+      {
+        "question": "We already have Epic's analytics tools. Why do we need Databricks?",
+        "bestAnswer": "Epic's tools are excellent for Epic data, but they don't unify your Cerner facilities, claims data, lab systems, or imaging metadata. Databricks is the layer that brings all of these together into a single Patient 360, enables cross-facility population health analytics, and provides the data foundation for AI models that span your entire patient population — capabilities that Epic's analytics cannot provide.",
+        "notes": "Never disparage Epic. Position Databricks as complementary to Epic, not competitive. The key differentiator is cross-system, cross-facility unification.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      }
+    ],
+    "risks": [
+      {
+        "title": "Patient Identity Resolution Complexity",
+        "description": "Matching patient records across 12 hospitals without a reliable enterprise MPI is the highest technical risk. Poor matching leads to duplicate Patient 360 records and incorrect clinical analytics.",
+        "likelihood": "High",
+        "impact": "High",
+        "mitigation": "Assess existing MPI coverage in discovery. If no enterprise MPI exists, build probabilistic matching in Silver using Databricks MLflow with a manual review workflow for uncertain matches. Set a 90%+ match rate KPI with clinical validation."
+      },
+      {
+        "title": "HL7 Interface Data Quality",
+        "description": "HL7 segment population varies by sending system and facility. Critical fields like attending physician, admission reason, and patient weight may be missing or in non-standard segments.",
+        "likelihood": "High",
+        "impact": "Medium",
+        "mitigation": "Build an HL7 data quality scorecard per facility during the discovery phase. Use DLT data quality expectations to quarantine records with critical missing fields and alert the interface team for remediation."
+      },
+      {
+        "title": "Organizational Change Management",
+        "description": "Clinical analysts accustomed to pulling data directly from Epic reporting tools may resist adopting a new platform, slowing adoption of the self-service analytics capability.",
+        "likelihood": "Medium",
+        "impact": "Medium",
+        "mitigation": "Involve clinical analysts as co-designers of the Gold layer data products and SQL Warehouse workspaces. Demonstrate time savings with a side-by-side comparison of the old and new process for a common report."
+      }
+    ],
+    "deliverables": [
+      {
+        "name": "Health System Lakehouse Architecture Blueprint",
+        "purpose": "A detailed technical design document covering the ingestion architecture, medallion layer design, Unity Catalog governance model, and AI platform integration.",
+        "outline": [
+          "Executive summary and business case",
+          "Current state data landscape assessment",
+          "Proposed architecture with component diagram",
+          "Medallion layer data model (Bronze/Silver/Gold schemas)",
+          "Unity Catalog governance model (catalogs, schemas, RBAC, masking policies)",
+          "Ingestion pipeline design (Auto Loader and DLT patterns)",
+          "AI platform integration design",
+          "Deployment roadmap and resource plan",
+          "Risk register and mitigation plan"
+        ]
+      },
+      {
+        "name": "Patient 360 Data Model Specification",
+        "purpose": "A detailed specification of the Silver layer Patient 360 entity — fields, sources, identity resolution logic, and FHIR R4 mapping.",
+        "outline": [
+          "Patient demographics canonical model",
+          "Identity resolution algorithm and MPI integration",
+          "Clinical encounter schema (inpatient, outpatient, ED)",
+          "Laboratory results schema with LOINC mapping",
+          "Medication schema with RxNorm mapping",
+          "Claims integration and financial dimension",
+          "Data quality rules and SLA definitions"
+        ]
+      }
+    ],
+    "executiveSummary": {
+      "sponsorReady": "We are building a unified clinical data platform on Databricks that will connect all 12 of your hospitals into a single governed data foundation. This platform will automate HEDIS quality reporting, deploy AI-powered readmission prediction, and enable your analytics teams to answer clinical questions in hours instead of weeks — delivering $6M+ in measurable ROI in the first year while building the infrastructure for your AI strategy.",
+      "thirtySecond": "Your 12 hospitals generate patient data that never comes together into a unified view — costing you CMS penalties, weeks of manual reporting, and blocking your AI ambitions. Databricks Lakehouse unifies all of it under a HIPAA-compliant governance layer, turning fragmented data into clinical intelligence.",
+      "twoMinute": "Today, your clinical data lives in siloed EHR systems, HL7 interfaces, claims processors, and imaging archives across 12 facilities. Your analytics team spends 70% of their time just extracting and reconciling data before they can analyze it. Your readmission rate is costing you $15M a year in CMS penalties that predictive models could reduce. Your CMIO wants clinical AI but there is no unified patient dataset to build it on. The Databricks Lakehouse solves all of this with a single architecture. Auto Loader and Delta Live Tables ingest data from all your sources — HL7, FHIR, claims, labs — into a Bronze layer that preserves everything. Delta Live Tables then transforms and normalizes this data into a Patient 360 Silver layer that resolves patient identities across all facilities. Gold layer clinical data products — readmission scores, care gaps, HEDIS measures — are available in SQL Warehouses for your analysts and embedded in EHR workflows for your clinicians. Unity Catalog governs all access with HIPAA-compliant controls. In 12 months, your quality reporting runs in 4 hours, your readmission program is live, and your AI team has the data foundation they need.",
+      "successIn12Months": [
+        "All 12 hospitals onboarded with Patient 360 available in production",
+        "HEDIS quality reporting cycle time reduced from 3 weeks to 4 hours",
+        "Readmission prediction model embedded in Epic workflow, reviewed by case managers daily",
+        "$6M+ in measurable ROI documented and presented to the board",
+        "Clinical analytics team operating with less than 30% time spent on data preparation"
+      ]
+    },
+    "meetingChecklist": [
+      "Confirm CMIO and CIO are both present — clinical and IT alignment is critical",
+      "Bring the readmission penalty dollar figure for the last 3 years",
+      "Prepare a visual showing the current state data fragmentation (the 12-hospital data landscape)",
+      "Have a demo environment ready showing Patient 360 and a HEDIS measure dashboard",
+      "Prepare the Unity Catalog HIPAA governance walkthrough for the compliance officer",
+      "Know the customer's cloud provider and whether they have an existing Databricks contract"
+    ],
+    "nextSteps": [
+      "Schedule a 2-hour data landscape assessment workshop with the clinical informatics and IT teams",
+      "Request access to a sample of HL7 messages and FHIR exports from one facility for POC development",
+      "Identify the clinical champion (CMIO or VP Analytics) who will co-own the POC evaluation",
+      "Deliver a 4-week POC proposal with scope, team, and success criteria",
+      "Schedule an executive briefing to present the POC results and phase 1 deployment roadmap"
+    ],
+    "whiteboardTalkTrack": [
+      "Draw the 12 hospitals across the left side of the whiteboard, each with their source systems (EHR, lab, imaging)",
+      "Show the current state: point-to-point lines going to a fragmented data warehouse — highlight the chaos",
+      "Erase the point-to-point lines and draw a single ingestion layer (Auto Loader + DLT) collecting from all sources",
+      "Add the Bronze, Silver, Gold layers with a brief explanation of what happens in each",
+      "Show Unity Catalog sitting beneath all layers as the governance foundation",
+      "On the right side, draw the consumers: SQL Warehouses, BI dashboards, and the Clinical AI Assistant",
+      "Highlight the clinical use cases in each box: HEDIS in Gold, readmission model in AI, Patient 360 in Silver"
+    ],
+    "workshopPlan": [
+      "Morning Session 1 (90 min): Current state data landscape mapping — catalog all source systems, interfaces, and data owners across all 12 hospitals",
+      "Morning Session 2 (60 min): Use case prioritization — rank the top 5 analytics and AI use cases by clinical impact and data readiness",
+      "Afternoon Session 1 (90 min): Architecture deep dive — walk through the proposed medallion architecture and governance model",
+      "Afternoon Session 2 (60 min): Roadmap and phasing — define Phase 1 scope, success metrics, and deployment timeline",
+      "Wrap-up (30 min): Next steps, POC proposal, and stakeholder alignment"
+    ],
+    "objections": [
+      {
+        "objection": "We already invested heavily in Epic and their analytics tools. Why add another platform?",
+        "response": "Epic Analytics is excellent for Epic-specific data and workflow, but it cannot unify data from your Cerner facilities, claims processors, or external lab systems. Databricks is complementary — it aggregates everything into a Patient 360 that makes Epic data more valuable by providing cross-facility context. The AI tools Epic is building (Cosmos, Cognitive Computing) also require a strong underlying data foundation that Databricks provides."
+      },
+      {
+        "objection": "Our IT team doesn't have Databricks or Spark skills. This will take years to staff up.",
+        "response": "SQL Warehouses let your clinical analysts use standard SQL — no Spark required. For the data engineering team, Databricks provides Python and SQL-based development experience that is much more accessible than traditional Hadoop or Spark programming. We can include a training and enablement plan in the engagement, and Databricks has a robust partner ecosystem for implementation support during the ramp-up period."
+      },
+      {
+        "objection": "How do we know the data will be secure enough for PHI?",
+        "response": "Databricks has signed BAAs with hundreds of health systems and holds HITRUST CSF certification. Unity Catalog provides column-level PHI masking and row-level access controls that are more granular than most enterprise data warehouses. Every data access event is logged in the audit system. We can walk through the full HIPAA Technical Safeguards checklist and map each control to a Databricks capability."
+      }
+    ]
+  }
+}

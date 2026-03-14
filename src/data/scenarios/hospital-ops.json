@@ -1,0 +1,498 @@
+{
+  "id": "hospital-ops-static",
+  "title": "Hospital Operations Intelligence Platform",
+  "updatedAt": "2026-03-14T00:00:00.000Z",
+  "input": {
+    "scenarioTitle": "Hospital Operations Intelligence Platform",
+    "industry": "Healthcare",
+    "customerType": "Health System",
+    "problemStatement": "A large health system cannot achieve real-time operational visibility into patient flow, bed management, staffing, and capacity because HL7 ADT messages, surgery scheduling, bed management, and staff scheduling systems are siloed with no unified operational intelligence layer — causing capacity crises, ED boarding, and nursing overtime.",
+    "businessGoals": "Build a real-time hospital operations platform using HL7 ADT streaming and scheduling data to enable a hospital command center with live census, predicted capacity, AI-powered staffing recommendations, and proactive bottleneck detection across all facilities.",
+    "constraints": "HL7 ADT messages must be processed within 60 seconds end-to-end, HIPAA compliance required for operational data containing PHI, the command center dashboard must support 100+ concurrent users during shift changes, and the solution must integrate with existing nursing scheduling systems without replacing them.",
+    "timeline": "6 months for real-time census and bed management dashboard, 12 months for staffing AI and predictive capacity",
+    "currentState": "Census data is maintained in manual spreadsheets updated every 4 hours by bed coordinators, ADT alerts go to individual pagers with no central visibility, surgery scheduling is in a standalone system, and staffing decisions are made by charge nurses using experience rather than data.",
+    "desiredFutureState": "A real-time hospital command center powered by streaming HL7 ADT events, predictive capacity models, AI-powered staffing recommendations, and automated bed assignment optimization across all facilities.",
+    "stakeholders": "COO, CNO (Chief Nursing Officer), VP of Patient Flow, Director of Bed Management, Director of Nursing Operations, CIO",
+    "compliance": ["HIPAA", "Joint Commission Accreditation"],
+    "architecturePreference": "Real-time streaming with Databricks Structured Streaming and Delta Live Tables",
+    "outputDepth": "Comprehensive"
+  },
+  "architecture": {
+    "title": "Hospital Operations Intelligence Platform Architecture",
+    "summary": "A real-time Databricks streaming platform processing HL7 ADT messages, surgery scheduling, bed management, and staff scheduling data into an operational state layer that powers a live hospital command center with predictive capacity and AI-driven staffing recommendations.",
+    "solutionOverview": "HL7 ADT messages from all hospital facilities stream through Structured Streaming in near real-time (target: 60-second end-to-end latency). Surgery scheduling, bed management, and staff scheduling data ingests via DLT pipelines. Delta Live Tables maintains an Operational State layer — the current single source of truth for patient census, bed status, and staffing levels — updated continuously as events arrive. A Gold Metrics layer materializes KPIs for the command center: occupancy rates, ED length of stay, predicted admission volumes, nursing staffing ratios, and predicted capacity shortfalls. Unity Catalog governs access to PHI with role-based controls. A Hospital Command Center Dashboard provides operational leadership with real-time visibility. A Staffing and Capacity AI provides predictive staffing recommendations and capacity alerts.",
+    "assumptions": [
+      "HL7 v2 ADT messages are available from the integration engine (Mirth Connect, Epic Bridges) as a message stream",
+      "Surgery scheduling system provides API access or real-time event feed for case bookings and status updates",
+      "Bed management system provides real-time bed status via API or HL7 bed management messages",
+      "Staff scheduling data is available from the scheduling system via API or nightly file export",
+      "A Kafka topic or message queue is available for HL7 ADT message buffering between the integration engine and Databricks"
+    ],
+    "details": [
+      {
+        "title": "Real-Time ADT Streaming",
+        "body": "HL7 ADT A01 (admission), A02 (transfer), A03 (discharge), A11 (cancel admission), A12 (cancel transfer), A13 (cancel discharge) messages are the core operational events. These messages flow from the EHR integration engine to a Kafka topic and are consumed by Databricks Structured Streaming. Each ADT event updates the patient's current location, status, and acuity in the Operational State Layer within 60 seconds of the event occurring in the EHR."
+      },
+      {
+        "title": "Operational State Layer",
+        "body": "The Operational State Layer maintains the current ground-truth state of all hospital operations: Patient Census table (one record per admitted patient, updated on each ADT event); Bed Status table (one record per physical bed with current status, patient, and expected discharge time); Surgery Schedule table (cases scheduled for the current and next 48 hours with real-time OR status); and Staffing State table (current staffing by unit, shift, and role from the scheduling system)."
+      },
+      {
+        "title": "Predictive Capacity Intelligence",
+        "body": "The Gold Metrics layer builds on the Operational State with predictive analytics: 4-hour and 8-hour admission volume predictions using historical ADT patterns, time-of-day/day-of-week seasonality, and current ED census; discharge prediction using a time-to-discharge model trained on historical length-of-stay data; and bed shortage probability by unit and shift derived from predicted admissions minus predicted discharges."
+      },
+      {
+        "title": "AI Staffing Recommendations",
+        "body": "The Staffing and Capacity AI generates recommended staffing adjustments based on predicted census and current nursing ratio compliance. Recommendations include floating nurses from over-staffed to under-staffed units, calling in additional staff 4-6 hours before predicted census surges, and alerting charge nurses to impending ratio compliance issues. All recommendations include the supporting data (predicted census, current staffing, target ratio) so charge nurses can make informed decisions."
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-adt",
+        "label": "HL7 ADT Messages",
+        "iconId": "source-adt",
+        "vendor": "generic",
+        "notes": "HL7 v2 ADT A01/A02/A03/A08 messages from Epic/Cerner integration engines covering all hospitals — admissions, transfers, discharges, and updates",
+        "x": 60,
+        "y": 100,
+        "metadata": { "group": "Operational Sources" }
+      },
+      {
+        "id": "n-surgery",
+        "label": "Surgery Scheduling",
+        "iconId": "source-scheduling",
+        "vendor": "generic",
+        "notes": "Surgical case schedule from OR scheduling system including case type, estimated duration, surgeon, anesthesia type, and real-time OR status updates",
+        "x": 60,
+        "y": 240,
+        "metadata": { "group": "Operational Sources" }
+      },
+      {
+        "id": "n-beds",
+        "label": "Bed Management",
+        "iconId": "source-bed-management",
+        "vendor": "generic",
+        "notes": "Bed management system with real-time bed status: available, occupied, dirty, in-maintenance — including expected discharge time and reservation status",
+        "x": 60,
+        "y": 380,
+        "metadata": { "group": "Operational Sources" }
+      },
+      {
+        "id": "n-staffing",
+        "label": "Staff Scheduling",
+        "iconId": "source-staffing",
+        "vendor": "generic",
+        "notes": "Nursing and clinical staff schedules from scheduling system (Kronos, API Healthcare) with current shift assignments, role, unit, and float pool status",
+        "x": 60,
+        "y": 520,
+        "metadata": { "group": "Operational Sources" }
+      },
+      {
+        "id": "n-streaming",
+        "label": "Structured Streaming",
+        "iconId": "databricks-etl-pipeline",
+        "vendor": "databricks",
+        "notes": "Kafka-sourced Structured Streaming consumer for HL7 ADT messages with HL7 v2 parsing, patient identity validation, and 60-second latency SLA",
+        "x": 290,
+        "y": 200,
+        "metadata": { "group": "Streaming Ingestion" }
+      },
+      {
+        "id": "n-dlt",
+        "label": "Delta Live Tables",
+        "iconId": "databricks-dlt",
+        "vendor": "databricks",
+        "notes": "DLT pipelines for surgery scheduling API integration, bed management event streaming, and staff scheduling batch ingestion with data quality expectations",
+        "x": 290,
+        "y": 420,
+        "metadata": { "group": "Streaming Ingestion" }
+      },
+      {
+        "id": "n-ops-state",
+        "label": "Operational State Tables",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Real-time operational ground truth: Patient Census, Bed Status, Surgery Schedule, and Staffing State — updated continuously as events arrive with Delta MERGE semantics",
+        "x": 560,
+        "y": 300,
+        "metadata": { "group": "Operational State" }
+      },
+      {
+        "id": "n-gold",
+        "label": "Gold Metrics Layer",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Predictive KPIs: occupancy rates, ED LOS, 4/8-hour admission predictions, discharge predictions, bed shortage probability, and nursing ratio compliance metrics",
+        "x": 800,
+        "y": 300,
+        "metadata": { "group": "Gold Metrics" }
+      },
+      {
+        "id": "n-uc",
+        "label": "Unity Catalog",
+        "iconId": "databricks-governance",
+        "vendor": "databricks",
+        "notes": "HIPAA-compliant access controls for operational PHI, role-based access by facility and function, audit logs for patient data access, and data lineage",
+        "x": 680,
+        "y": 560,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-sql",
+        "label": "SQL Warehouses",
+        "iconId": "databricks-sql-warehouses",
+        "vendor": "databricks",
+        "notes": "Serverless SQL Warehouses serving the command center dashboard and operational analytics with sub-second query latency on the Operational State tables",
+        "x": 1060,
+        "y": 160,
+        "metadata": { "group": "Operations Analytics" }
+      },
+      {
+        "id": "n-dashboard",
+        "label": "Hospital Command Center Dashboard",
+        "iconId": "databricks-dashboards",
+        "vendor": "databricks",
+        "notes": "Real-time live census by unit, bed availability map, surgery schedule, ED throughput metrics, predictive capacity alerts, and staffing ratio compliance view",
+        "x": 1260,
+        "y": 220,
+        "metadata": { "group": "Operations Analytics" }
+      },
+      {
+        "id": "n-ai",
+        "label": "Staffing & Capacity AI",
+        "iconId": "databricks-genie",
+        "vendor": "databricks",
+        "notes": "AI-powered staffing recommendations: float nurse deployment, call-in suggestions 4-6 hours ahead, and capacity surge alerts — all with supporting data for charge nurse decision-making",
+        "x": 1180,
+        "y": 420,
+        "metadata": { "group": "Operations Analytics" }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n-adt", "target": "n-streaming", "label": "HL7 ADT Kafka stream", "protocol": "Kafka/MLLP" },
+      { "id": "e2", "source": "n-surgery", "target": "n-dlt", "label": "OR schedule API / events", "protocol": "REST" },
+      { "id": "e3", "source": "n-beds", "target": "n-dlt", "label": "Bed status event stream", "protocol": "API/HL7" },
+      { "id": "e4", "source": "n-staffing", "target": "n-dlt", "label": "Staff schedule batch / API", "protocol": "API/File" },
+      { "id": "e5", "source": "n-streaming", "target": "n-ops-state", "label": "Real-time census MERGE", "protocol": "Delta MERGE" },
+      { "id": "e6", "source": "n-dlt", "target": "n-ops-state", "label": "Schedule and staffing update", "protocol": "Delta MERGE" },
+      { "id": "e7", "source": "n-ops-state", "target": "n-gold", "label": "Predictive KPI computation", "protocol": "Spark" },
+      { "id": "e8", "source": "n-ops-state", "target": "n-uc", "label": "PHI access governance", "protocol": "Unity Catalog" },
+      { "id": "e9", "source": "n-gold", "target": "n-uc", "label": "Metrics registration", "protocol": "Unity Catalog" },
+      { "id": "e10", "source": "n-gold", "target": "n-sql", "label": "SQL query access", "protocol": "SQL" },
+      { "id": "e11", "source": "n-sql", "target": "n-dashboard", "label": "Live dashboard data", "protocol": "SQL" },
+      { "id": "e12", "source": "n-gold", "target": "n-ai", "label": "Capacity and staffing context", "protocol": "REST" },
+      { "id": "e13", "source": "n-ai", "target": "n-dashboard", "label": "Staffing recommendations", "protocol": "REST" },
+      { "id": "e14", "source": "n-uc", "target": "n-ai", "label": "Governed operational data access", "protocol": "Unity Catalog" }
+    ],
+    "refinements": [
+      "Add predictive ED surge detection that alerts the command center 4-8 hours before predicted ED capacity constraint",
+      "Build automated bed assignment recommendation engine that suggests optimal bed placements based on patient acuity, room configuration, and nursing ratio",
+      "Implement a discharge prediction model that scores every admitted patient's likelihood of discharge in the next 4/8/24 hours, enabling proactive discharge coordination",
+      "Add cross-facility patient transfer optimization to balance census across the health system network during surge conditions",
+      "Integrate ambulance diversion data and regional census data from neighboring hospitals for regional capacity coordination"
+    ]
+  },
+  "architectAnswers": {
+    "why_w1": "The health system's hospitals regularly operate at 90%+ occupancy with no real-time visibility into bed availability across facilities. When the ED reaches capacity, nursing supervisors call bed coordinators who check manual spreadsheets updated 4 hours ago. By the time a bed is identified, cleaned, and the patient transferred, 2-4 additional hours have elapsed — extending ED boarding that directly worsens patient outcomes and CMS core measure scores.",
+    "why_w2": "Nursing overtime costs the health system $8M annually beyond budget. Charge nurses make staffing decisions at the beginning of each shift based on the census at that moment, with no visibility into predicted admissions over the next 8 hours. When a surge arrives mid-shift, float pool nurses are called in on overtime. Predictive staffing 4-6 hours ahead would shift a significant portion of this overtime from emergency call-ins to planned additions at straight-time rates.",
+    "why_w3": "The Joint Commission surveys and CMS quality reporting increasingly focus on patient flow metrics — ED length of stay, time to inpatient bed assignment, discharge turnaround. These metrics are calculated manually from ADT data exports by the quality team monthly. A real-time command center with live metric calculation enables proactive operational management to improve these scores before they impact Joint Commission accreditation.",
+    "why_h1": "Post-surgical patient placement is a daily operational bottleneck: PACU (Post-Anesthesia Care Unit) is frequently at capacity because medical-surgical floors cannot accept patients quickly enough after surgery. PACU backup causes OR delays — surgeries cannot start if there's no PACU bed for the recovering patient. Linking surgery scheduling data with census data enables coordinated management of the surgical patient flow.",
+    "why_h2": "Elective surgery scheduling creates predictable census surges on specific days of the week. Monday through Wednesday tend to be high-census days due to weekend admissions and early-week elective surgeries. These patterns are well-known qualitatively but are not built into staffing models quantitatively. The Gold Metrics predictive model using historical ADT data can make these patterns quantitative and actionable for staffing decisions.",
+    "why_h3": "The COO and CNO spend 2-3 hours each morning in a manual data collection call — bed coordinators from each facility report census numbers by phone, which are then entered into a spreadsheet for the command briefing. This process produces stale data and consumes senior leadership time. A real-time command center dashboard eliminates this call and gives leadership continuous visibility.",
+    "goal_g1": "The primary goal is a real-time census view across all hospitals that reflects ADT events within 60 seconds of their generation in the EHR, replacing the current 4-hour manual update cycle. The target metric is time from ADT A03 (discharge) generation to bed appearing as 'available' in the command center dashboard: under 60 seconds.",
+    "goal_g2": "The predictive staffing system must generate actionable recommendations at least 4 hours before predicted census surges, giving nursing supervisors enough lead time to schedule additional staff at straight-time rates rather than emergency overtime. Target: 70% of shift-level staffing adjustments completed before the surge rather than during.",
+    "goal_o1": "Bed turnaround acceleration: the average time from discharge ADT event to bed-clean notification (environmentally serviced and ready for next patient) should be tracked in real-time and targeted to under 45 minutes for medical-surgical beds. Current average is 62 minutes due to delayed notification to environmental services. Real-time ADT streaming enables immediate EVS notification upon discharge.",
+    "goal_o2": "ED boarding reduction: ED patients waiting for an inpatient bed (boarders) represent a critical patient safety and throughput metric. The command center must provide ED charge nurses with a real-time view of predicted bed availability including anticipated discharges in the next 2-4 hours, enabling proactive placement decisions before the patient is ready to leave the ED.",
+    "goal_a1": "Command center performance: the dashboard must support 100+ concurrent users during shift-change periods (7 AM, 3 PM, 11 PM) without performance degradation. SQL Warehouses with serverless auto-scaling and Delta Lake result caching on frequently queried Operational State tables deliver sub-second query response at any concurrency level.",
+    "goal_a2": "Staffing AI response time: the staffing recommendation model must deliver recommendations within 30 seconds of the relevant operational event (admission surge, unexpected staff call-out, PACU backup) so nursing supervisors can respond immediately during dynamic situations.",
+    "goal_l1": "Operational state data contains PHI (patient name, MRN, location, diagnosis). Access is role-based: command center staff see real-time census but no diagnosis details; nursing supervisors see their units with patient acuity information; EVS staff see only bed status with room numbers but no patient identity; executives see aggregate metrics only without individual patient data.",
+    "goal_l2": "Historical operational data used for predictive model training must be de-identified before use in analytics workloads that cross hospital systems. The de-identification process removes patient identifiers from ADT records used for historical analysis. The real-time command center uses identified data with HIPAA-compliant access controls.",
+    "safe_s1": "HIPAA safeguards for operational PHI: the command center processes patient name, MRN, date of birth, location, and diagnosis in the Operational State layer. All data is encrypted at rest (AES-256) and in transit (TLS 1.2+). Access requires HIPAA workforce training and role-based Unity Catalog authorization. All access to patient-level data is logged for HIPAA audit purposes.",
+    "safe_s2": "The EVS (Environmental Services) mobile app integration exposes only room number and bed status — never patient identity information — to environmental services staff. This minimum necessary data sharing is enforced by a Unity Catalog row-level filter on the bed status view that strips patient information before the EVS query returns results.",
+    "safe_a1": "ADT message processing uses exactly-once semantics in Kafka + Structured Streaming to ensure that no admission, transfer, or discharge event is missed or double-processed. A missed discharge event would leave a bed showing as occupied when it's actually empty — directly causing bed availability errors in the command center. A duplicate admission event would inflate census counts.",
+    "safe_a2": "The Operational State layer uses Delta Lake MERGE semantics for all updates: each ADT event triggers a MERGE operation that updates the patient's record or inserts a new record if the patient doesn't exist. Delta Lake's ACID guarantees prevent partial updates that could leave the census table in an inconsistent state during a high-volume event burst (e.g., a large surgery schedule completing simultaneously).",
+    "safe_f1": "HL7 ADT parsing includes structural validation: required segments (MSH, EVN, PID, PV1) must be present, patient identifiers (MRN, visit number) must be non-null, and encounter type must be a valid ADT event type. ADT messages failing structural validation are written to a dead-letter queue and trigger an alert to the integration engine team for remediation.",
+    "safe_e1": "The command center platform has a 30-minute RTO — clinical operations depend on real-time census data. If the Databricks streaming pipeline fails, the command center dashboard switches to a read-only mode showing the last known state with a 'data may be delayed' indicator. The EVS notification system has an independent fallback mode using direct EHR notification as backup.",
+    "safe_e2": "Structured Streaming checkpoint files are stored in object storage with cross-region replication, enabling pipeline recovery from exactly the last committed offset after a failure — no ADT events are lost or replayed. Recovery from a complete pipeline failure is tested monthly, with a target recovery time under 30 minutes including checkpoint restoration.",
+    "flow_f1": "Real-time data flow: EHR generates ADT event → integration engine (Mirth Connect) → Kafka topic → Structured Streaming consumer → HL7 v2 parsing → Operational State MERGE (patient census update) → Delta change data feed → Gold Metrics computation → command center dashboard refresh. Target end-to-end: 60 seconds from EHR event to dashboard update.",
+    "flow_l1": "The 60-second latency SLA is the core operational requirement. The latency budget: ADT message generation in EHR (0 sec) → Mirth Connect processing (5-10 sec) → Kafka publication (5 sec) → Structured Streaming micro-batch trigger (up to 15 sec) → HL7 parsing and Operational State MERGE (10-15 sec) → Gold metrics update (5 sec) → dashboard cache invalidation and refresh (5-10 sec). Total: 45-60 seconds under normal conditions.",
+    "flow_o1": "Data quality for ADT processing: ADT messages from different EHR systems (Epic, Cerner, Meditech) have different segment population patterns for the same fields. A facility-specific ADT mapping layer handles these differences before the normalized patient record is written to the Operational State. New facility onboarding includes an ADT message quality assessment and mapping specification.",
+    "flow_w1": "The streaming pipeline runs continuously (24/7) without scheduled batch windows. Databricks Workflows monitors streaming pipeline health and triggers PagerDuty if micro-batch processing times exceed 30 seconds (indicating latency SLA risk) or if the streaming pipeline stops processing (indicating a failure). Staffing AI recommendations are computed by a triggered job on the Gold Metrics layer every 30 minutes.",
+    "data_d1": "Operational data domains: Patient Census (MRN, visit number, admission time, current unit, bed, attending physician, diagnosis codes, acuity score, expected discharge date); Bed Status (unit, room, bed, current status, occupying patient, EVS status, last status change time); Surgery Schedule (case number, patient MRN, procedure type, surgeon, scheduled start time, actual start time, estimated end time, OR number, status); and Staff Schedule (employee ID, role, unit, shift start/end, float eligibility, current assignment).",
+    "data_d2": "Derived operational analytics domains computed in the Gold Metrics layer: Capacity Metrics (occupancy rate by unit, predicted occupancy in 4/8/12 hours, available beds by type, census trajectory compared to 30-day historical pattern); Throughput Metrics (ED length of stay by acuity, time-to-bed assignment, bed turnaround time, PACU hold time); and Staffing Metrics (actual-to-budgeted nursing ratio by unit and shift, float nurse availability, predicted ratio compliance 4 hours forward).",
+    "data_a1": "Census data quality challenges include duplicate ADT messages (EHR systems occasionally retry failed transmissions), out-of-order messages (transfer completed before the preceding admission is processed), and cancelled events that reverse prior events (A11 cancels A01). The Operational State MERGE logic handles all of these patterns using the HL7 message control ID for deduplication and event timestamps for ordering.",
+    "data_a2": "Surgery schedule data completeness is variable: some OR systems populate the estimated procedure end time, others do not. Without end time estimates, PACU surge predictions are less accurate. A predictive procedure duration model trained on historical OR data fills in missing end time estimates based on procedure type, surgeon, and complexity modifiers.",
+    "data_t1": "The Operational State uses a current-state storage pattern: each table maintains only the current state of each entity (one row per patient, one row per bed, one row per surgery case). Historical snapshots are taken hourly to the Bronze archive layer, enabling trend analysis and model training without querying the real-time Operational State tables for historical data.",
+    "data_t2": "HL7 v2 parsing produces a normalized event model with standard fields extracted from variable HL7 segment positions. A facility-specific extraction configuration file maps the correct segment and field positions for each sending system's HL7 dialect. This configuration-driven parsing approach enables new facility onboarding without code changes to the core Structured Streaming pipeline.",
+    "data_a3": "HIPAA retention: patient PHI in the Operational State is retained in the current state table indefinitely (active patients) and in the historical Bronze archive for 7 years per HIPAA requirements. Analytical models trained on de-identified historical data do not have PHI and are retained as model artifacts in MLflow without retention constraints.",
+    "data_a4": "Operational data lineage: Unity Catalog tracks the lineage from each Gold Metrics value to the contributing Operational State events and ultimately to the original ADT messages. This lineage enables post-incident analysis — for example, after a census reporting discrepancy, the lineage shows exactly which ADT messages contributed to the incorrect count and when they were processed.",
+    "fast_f1": "The fastest path to value is replacing the morning census call with a live command center dashboard. Within 8-10 weeks of ADT streaming deployment, the COO and CNO can start each day with an accurate, real-time view of census across all facilities — eliminating the 2-3 hour manual data collection call that currently occupies senior leadership every morning.",
+    "fast_f2": "An automated EVS notification system — sending a text/app alert to environmental services staff within 60 seconds of a discharge ADT event — can be deployed in 4-6 weeks on top of the streaming pipeline. This single automation reduces average bed turnaround time by 15-20 minutes by eliminating the delay between discharge and EVS notification, a change visible within weeks of deployment.",
+    "fast_a1": "The 10-week rapid deployment plan: Weeks 1-3 cover Kafka integration, Structured Streaming pipeline, and HL7 ADT parsing for the primary EHR system. Weeks 4-6 deliver the Operational State census table and a live bed availability view. Weeks 7-8 add the command center dashboard and EVS notification integration. Weeks 9-10 add surgery schedule integration and the first predictive capacity metrics.",
+    "fast_a2": "Pilot with a single high-census hospital before rolling out to all facilities. This reduces the ADT message volume and facility complexity during pipeline development and validation. Once the pipeline is validated at one facility, adding additional hospitals requires only configuration changes (Kafka topic, facility code mapping) rather than pipeline code changes.",
+    "fast_s1": "90-day quick wins: (1) Real-time census dashboard replacing manual census call; (2) EVS automated notification reducing bed turnaround by 15-20 minutes; (3) Surgery-to-PACU capacity link showing predicted PACU demand from the next 4 hours of OR schedule; (4) ED census alert when ED occupancy exceeds 85% threshold. Each is visible to clinical and operational leadership immediately.",
+    "fast_t1": "HL7 v2 parsing libraries (e.g., HAPI HL7 Java library, python-hl7) are open source and well-tested for all standard ADT message types. Wrapping these in a Spark UDF enables HL7 parsing within DLT/Structured Streaming without custom parsing code, reducing HL7 development time from 3-4 weeks to 3-5 days.",
+    "fast_t2": "Databricks Delta Live Tables' continuous mode enables the census table to be updated as fast as micro-batches complete — typically every 5-15 seconds for a single-facility ADT stream — without any scheduling configuration. The dashboard auto-refreshes on a 30-second timer, providing the operational team with census that is typically under 30 seconds old.",
+    "run_r1": "Platform operations: 2 data engineers manage the ADT streaming pipeline and Operational State maintenance; 1 data scientist manages the predictive capacity and staffing models; 1 platform administrator manages Unity Catalog access and HIPAA compliance. The command center dashboard is owned by the hospital operations team, not the data engineering team — they configure alerts and thresholds through a self-service interface.",
+    "run_r2": "Infrastructure cost for the operations platform: serverless SQL Warehouses with auto-scaling handle the 100+ concurrent command center users during shift change without over-provisioning. Structured Streaming runs on a dedicated job cluster sized for the ADT message volume. Total estimated monthly compute cost: $8,000-12,000 — less than a single overtime FTE monthly.",
+    "run_u1": "New hospital facility onboarding follows a 4-week process: Kafka topic configuration for the facility's ADT feed → HL7 segment mapping configuration for the facility's EHR → Operational State integration testing with the facility's test environment → production cutover with parallel validation. The command center dashboard auto-includes the new facility when its first ADT event appears in the Operational State.",
+    "run_u2": "The predictive capacity model is retrained quarterly using the most recent 12 months of historical census data. Seasonal patterns (flu season, summer elective surgery volume) are captured in the training data. Model performance is measured weekly by comparing predicted-to-actual 4-hour census, with a retraining trigger if prediction error exceeds 15% for 2 consecutive weeks.",
+    "run_n1": "The operations platform is deployed in the health system's HIPAA-compliant cloud environment with VPC isolation and private endpoints. All ADT Kafka topic traffic routes through the VPC without public internet traversal. The command center dashboard is accessible from the health system's internal network and authorized VPN connections only — it is not a public-facing application.",
+    "win_w1": "Operational success metrics at 12 months: (1) ADT event to dashboard update latency under 60 seconds at the 95th percentile; (2) Bed turnaround time reduced from 62 to under 45 minutes; (3) ED boarding time reduced by 20% through real-time bed assignment coordination; (4) Nursing overtime reduced by 15% through predictive staffing; (5) Morning census call eliminated saving 2 hours of senior leadership time daily.",
+    "win_i1": "Business impact: $1.2M annual nursing overtime reduction; $800K in ED throughput improvement (fewer LWBS — left without being seen — patients and improved CMS throughput scores); $500K in PACU efficiency improvement from OR-PACU coordination; $300K in EVS labor efficiency from direct discharge notification. Total annual value: $2.8M against a platform cost of $200K — 14:1 ROI.",
+    "win_n1": "The Hospital Operations Intelligence Platform becomes the backbone of the health system's clinical operations strategy. Over 3-5 years, the real-time operational data enables AI-powered bed assignment optimization, automated discharge coordination workflows, and system-wide patient flow management across all facilities. The platform evolves from a visibility tool to an operational orchestration system — moving from 'showing what is happening' to 'recommending what to do' to eventually 'automating routine decisions' for non-clinical operational choices."
+  },
+  "story": {
+    "strategy": "The health system's operational intelligence strategy was built around a single architectural principle: operational decisions require operational speed — sub-60-second data freshness, not T+1 batch analytics. The Databricks Structured Streaming + Delta Lake MERGE architecture was chosen specifically because it maintains a current-state operational table that is always accurate to the last ADT event, unlike a data warehouse that rebuilds the census periodically from batch exports.",
+    "technology": "The platform uses Databricks Structured Streaming with Kafka as the ADT event bus, consuming HL7 v2 messages parsed with a Spark UDF wrapping the HAPI HL7 library. Delta Lake MERGE operations maintain the Operational State tables with ACID guarantees, preventing census inconsistencies during high-volume event bursts. Unity Catalog enforces HIPAA-compliant PHI access with role-based controls that let EVS staff see only room numbers, charge nurses see their unit with acuity, and executives see aggregate metrics.",
+    "outcome": "Within 10 weeks, the live census dashboard replaced the morning census call across all 8 facilities. Within 4 months, EVS automated notification reduced average bed turnaround time from 62 to 41 minutes — a 34% improvement. Within 12 months, the predictive staffing system contributed to a 17% reduction in nursing overtime spending ($1.36M saved against an $8M annual overtime budget). ED boarding times fell by 23% as real-time bed availability information enabled proactive placement decisions.",
+    "returnValue": "Platform investment: $1.4M in the first year (development, infrastructure, training). Measured returns: $1.36M in nursing overtime reduction; $820K in ED throughput improvement from reduced boarding; $480K in PACU and OR efficiency gains from surgical schedule integration; $280K in EVS labor savings from discharge notification automation. First-year ROI: $2.94M return on $1.4M investment — 2.1:1, with improving returns as predictive models mature.",
+    "years": "Over 5 years, the platform evolves from a visibility tool to a clinical operations orchestration system. AI-powered bed assignment optimization automatically routes admission requests to the optimal bed based on patient acuity, infection control status, nursing ratio, and proximity to required services. Discharge prediction models enable coordinated discharge planning that smooths the daily census wave, reducing the late-afternoon bottleneck when admissions peak and discharges are still pending. The health system achieves top quartile performance on CMS patient flow measures — a competitive differentiator in health system partnerships and value-based care contracts."
+  },
+  "playbook": {
+    "scenarioTitle": "Hospital Operations Intelligence Platform",
+    "scenarioSummary": "A large health system needs real-time operational intelligence using HL7 ADT streaming, surgery scheduling, bed management, and staff scheduling data on Databricks. The platform powers a hospital command center with live census, predictive capacity, AI staffing recommendations, and automated EVS notification — replacing manual processes with real-time operational intelligence.",
+    "businessDrivers": [
+      "Manual census updates every 4 hours cause delayed bed assignments and prolonged ED boarding",
+      "Nursing overtime costs $8M annually due to reactive staffing decisions without predictive census data",
+      "Morning leadership census calls consume 2-3 hours of COO and CNO time daily",
+      "ED throughput CMS core measures are below target due to delays in bed assignment after admission decision",
+      "Joint Commission surveys increasingly focus on patient flow metrics that require real-time operational data"
+    ],
+    "constraints": [
+      "HL7 ADT events must be reflected in the command center within 60 seconds of generation in the EHR",
+      "HIPAA minimum necessary standard requires access controls distinguishing clinical from operational PHI use",
+      "The existing EHR and scheduling systems cannot be replaced — the platform must integrate with current systems"
+    ],
+    "recommendedEngagementApproach": [
+      "Quantify the nursing overtime cost and calculate the reduction from predictive staffing 4 hours ahead",
+      "Estimate the revenue impact of reduced ED boarding time from improved throughput and LWBS reduction",
+      "Deliver a 4-week ADT streaming POC showing live census for a single facility",
+      "Present the command center dashboard to COO and CNO as a visual demonstration of the operational transformation"
+    ],
+    "confidenceRating": 91,
+    "recommendedConversationPath": [
+      "Current census process: How is census information collected and distributed today? How stale is the data?",
+      "ED boarding problem: What is the current average ED boarding time and what drives the delays?",
+      "Staffing decisions: How do charge nurses decide staffing levels? What information do they have access to?",
+      "OR-PACU flow: How often does PACU backup delay OR start times? What is the cascading cost?",
+      "Technology landscape: What EHR system, integration engine, and scheduling systems are in place?"
+    ],
+    "discoveryQuestions": [
+      {
+        "category": "Current State Operations",
+        "question": "Walk me through how you currently know the real-time census across your facilities — who knows, how often is the information updated, and what decisions are made from it?",
+        "whyItMatters": "Understanding the current census process quantifies the latency and accuracy gap that real-time streaming addresses. It also identifies the key users and decisions that the command center must serve.",
+        "goodSignal": "Manual spreadsheet updated every 4 hours, COO calls bed coordinators by phone for status — clear high-value improvement opportunity.",
+        "redFlag": "Already using a real-time bed tracking system — the problem is different (analytics and AI, not operational visibility). Refocus on predictive staffing and capacity planning."
+      },
+      {
+        "category": "ED Throughput",
+        "question": "What is your current average time from ED admission decision to inpatient bed assignment, and what percentage of your annual ED patients experience boarding over 2 hours?",
+        "whyItMatters": "ED boarding time is the most visible patient flow metric and the most directly addressable by real-time bed visibility. Quantifying the current state establishes the baseline for ROI calculation.",
+        "goodSignal": "Average 3-4 hours from admission decision to bed assignment, 15%+ of patients boarding over 2 hours — significant room for improvement from real-time bed visibility.",
+        "redFlag": "ED boarding metrics are not tracked currently — need to establish baseline first before promising improvement targets."
+      },
+      {
+        "category": "HL7 Integration",
+        "question": "What integration engine do you use for HL7 message routing, and are ADT messages currently being routed to any downstream systems in real-time?",
+        "whyItMatters": "The integration engine type and current ADT routing determines the complexity of Kafka integration. An existing Kafka connection to another system indicates the infrastructure is already in place.",
+        "goodSignal": "Mirth Connect or Rhapsody with an active ADT feed and an existing Kafka topic for some downstream consumer — minimal infrastructure work required.",
+        "redFlag": "Custom MLLP interfaces with no Kafka or message bus — requires significant integration infrastructure build before streaming can begin."
+      },
+      {
+        "category": "Nursing Operations",
+        "question": "What does the nursing overtime approval process look like, and how far in advance can charge nurses typically plan additional staffing vs emergency call-ins?",
+        "whyItMatters": "The lead time available for proactive staffing decisions determines the value of predictive capacity models. Very short lead times (under 2 hours) limit the actionability of predictions.",
+        "goodSignal": "Nursing supervisors can plan 6-8 hours ahead for scheduled additions at straight time but must call overtime for shifts starting in less than 2 hours — predictive staffing 4+ hours ahead has clear ROI.",
+        "redFlag": "Union contracts require 12+ hours advance notice for schedule changes — very long lead time requirement increases the difficulty of the predictive model and reduces actionable recommendations."
+      },
+      {
+        "category": "Command Center Vision",
+        "question": "Does the COO or CNO have a vision for what a hospital command center would look like operationally — who would staff it, what decisions would be centralized, and what would trigger an escalation?",
+        "whyItMatters": "A command center requires organizational change alongside the technology. If leadership hasn't thought through the operational model, the technology will be deployed without being used effectively.",
+        "goodSignal": "COO has a clear command center operating model in mind — designated staffing, escalation protocols, decision rights — and sees the technology as enabling a pre-planned organizational change.",
+        "redFlag": "No command center organizational model — the technology is being evaluated before the operational model is defined. Technology without process change delivers limited value."
+      }
+    ],
+    "problemFraming": {
+      "statement": "A large health system's hospital operations are managed with census data that is 4 hours old, staffing decisions made without predictive demand information, and operational leadership spending hours daily on manual data collection — resulting in ED boarding, nursing overtime, and PACU delays that directly harm patient outcomes and health system economics.",
+      "desiredOutcomes": [
+        "Real-time census dashboard with under 60-second ADT event latency replacing 4-hour manual updates",
+        "Automated EVS notification within 60 seconds of discharge, reducing bed turnaround by 20+ minutes",
+        "Predictive staffing recommendations 4-6 hours in advance, reducing overtime by 15%+",
+        "ED boarding time reduced by 20%+ through real-time bed assignment coordination",
+        "Morning leadership census call eliminated, returning 2 hours daily to COO and CNO"
+      ],
+      "assumptions": [
+        "ADT messages are available from the integration engine as a near-real-time stream",
+        "Kafka infrastructure can be provisioned to buffer ADT messages between the integration engine and Databricks",
+        "The organizational command center model is defined before technology deployment",
+        "Nursing leadership will adopt AI staffing recommendations when supported by transparent supporting data"
+      ],
+      "nonNegotiables": [
+        "60-second end-to-end ADT latency SLA — operational decisions require operational speed",
+        "HIPAA minimum necessary access controls — EVS staff cannot see patient PHI",
+        "100+ concurrent dashboard users during shift change — command center must be reliable during peak operational moments"
+      ],
+      "unknowns": [
+        "ADT message volume per facility and peak message rate during high-census periods",
+        "Integration engine Kafka capability and whether a message bus is already in place",
+        "Nursing union contract constraints on staffing schedule changes"
+      ],
+      "framingStatement": "By deploying a real-time operations platform on Databricks that streams HL7 ADT events into a live census and predictive capacity system, the health system can transform hospital operations from reactive manual coordination to proactive data-driven management — saving $2.8M annually while improving patient outcomes and staff experience."
+    },
+    "architectureOptions": [
+      {
+        "name": "Real-Time ADT Streaming Command Center",
+        "summary": "A Databricks Structured Streaming platform consuming HL7 ADT events via Kafka, maintaining a current-state Operational State layer, and powering a live command center dashboard with predictive capacity and AI staffing recommendations.",
+        "whenToUse": [
+          "Hospital operations requiring sub-60-second census data freshness",
+          "ED boarding and bed turnaround improvement requiring real-time bed availability",
+          "Nursing overtime reduction requiring predictive staffing 4-6 hours ahead",
+          "Command center deployment requiring 100+ concurrent users with reliable performance"
+        ],
+        "benefits": [
+          "Sub-60-second ADT latency delivers operational-speed intelligence for the first time",
+          "Delta Lake MERGE semantics maintain accurate current-state census without complex CDC logic",
+          "EVS automation on top of streaming pipeline is a 4-6 week quick win with immediate ROI",
+          "Predictive staffing AI leverages the same streaming infrastructure without additional data sources"
+        ],
+        "tradeoffs": [
+          "Requires Kafka infrastructure between integration engine and Databricks",
+          "HL7 v2 parsing complexity varies by facility and EHR system — facility-specific configuration required",
+          "60-second SLA requires careful latency budget management across all pipeline stages"
+        ],
+        "idealMaturityLevel": "Intermediate",
+        "platformMapping": [
+          "Structured Streaming + Kafka → real-time ADT event consumption",
+          "Delta Lake MERGE → current-state Operational State tables",
+          "DLT → surgery schedule and staffing data integration",
+          "Gold Metrics Layer → predictive capacity and staffing KPIs",
+          "Unity Catalog → HIPAA-compliant PHI access by role"
+        ],
+        "components": [
+          { "layer": "Streaming", "items": ["Kafka (ADT event bus)", "Structured Streaming (HL7 consumer)", "HL7 v2 parser (HAPI library UDF)"] },
+          { "layer": "Operational State", "items": ["Patient Census (MERGE on ADT events)", "Bed Status (MERGE on bed events)", "Surgery Schedule (DLT)", "Staff Schedule (DLT)"] },
+          { "layer": "Gold Metrics", "items": ["Occupancy rates (real-time)", "Predicted admissions (4h/8h)", "Discharge predictions", "Nursing ratio compliance"] },
+          { "layer": "AI", "items": ["Staffing recommendation model (MLflow)", "Predictive capacity model", "Discharge prediction model"] }
+        ],
+        "talkTrack": [
+          "Delta Lake MERGE is the operational magic — when an ADT A01 admission event arrives, MERGE either inserts a new patient record or updates an existing one atomically. The census table is always accurate to the last ADT event. There's no batch window, no reconciliation, no catch-up.",
+          "The EVS automation is the fastest win — 60 seconds after a discharge ADT is processed, a text message goes to the environmental services team for that room. Currently, that notification waits until a bed coordinator calls them. We're adding 15-20 minutes back to the bed turnaround time for free.",
+          "The staffing AI doesn't replace the charge nurse's judgment — it gives them a quantitative basis for a decision they're already making. Instead of intuition about whether to call in a float nurse, they see 'in 5 hours, 4J North is predicted to be at 105% occupancy with a ratio violation — recommend calling float now while straight-time is available.'"
+        ]
+      }
+    ],
+    "mockInterview": [],
+    "customerQuestions": [
+      {
+        "question": "Our EHR vendor (Epic) says we should use their native analytics tools. Why do we need Databricks for this?",
+        "bestAnswer": "Epic's operational analytics tools are excellent for Epic-specific operational reporting. However, Epic does not have native streaming infrastructure for real-time ADT event processing with sub-60-second latency — their reporting is based on periodic extracts. More importantly, your staffing system (Kronos) and your surgery scheduling system may not be Epic systems, and Epic can't natively integrate those into a unified operational view. Databricks provides the streaming infrastructure that Epic does not, while complementing Epic's clinical data.",
+        "notes": "Never disparage Epic. Position Databricks as filling the streaming and multi-system integration gap that Epic's reporting tools don't address. The key is 'real-time' and 'multi-system.'",
+        "weakAnswer": null,
+        "strongAnswer": null
+      },
+      {
+        "question": "How do we handle HIPAA compliance when we're streaming PHI through this platform?",
+        "bestAnswer": "The streaming pipeline processes PHI for a specific HIPAA-compliant purpose: treatment operations (care coordination and operations management are explicitly included in HIPAA's operations definition). The Databricks workspace is deployed in a HIPAA-compliant cloud environment with a BAA. Unity Catalog enforces minimum necessary access: EVS staff see room numbers only, charge nurses see their unit patients, executives see aggregate metrics. All PHI access is logged. This architecture has been deployed at HIPAA-regulated health systems and satisfies HIPAA operational requirements.",
+        "notes": "Treatment operations is a key HIPAA exception that permits PHI use for care coordination and operational management. HIPAA counsel should confirm the specific use cases, but operational analytics for patient flow management is generally well within the treatment operations exception.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      }
+    ],
+    "risks": [
+      {
+        "title": "Kafka Integration Engine Complexity",
+        "description": "Mirth Connect and other HL7 integration engines vary in their Kafka publishing capability. Some may require significant configuration or custom channel development to publish ADT messages to a Kafka topic, adding unexpected integration lead time.",
+        "likelihood": "Medium",
+        "impact": "Medium",
+        "mitigation": "Conduct an integration engine capability assessment in the first week of the project. If native Kafka publishing is not available, deploy a lightweight Kafka producer microservice that subscribes to the existing MLLP ADT feed and publishes to Kafka — a 2-3 week development that unblocks the streaming pipeline."
+      },
+      {
+        "title": "HL7 Message Quality Variation by Facility",
+        "description": "HL7 ADT message segment population varies significantly between facilities using different EHR systems. Critical fields like patient acuity, expected discharge date, and care team may be missing from some sending systems, limiting the richness of the command center data for those facilities.",
+        "likelihood": "High",
+        "impact": "Medium",
+        "mitigation": "Conduct an HL7 message quality assessment per facility during onboarding, scoring each critical field's population rate. Implement facility-specific default value logic for commonly missing fields. Escalate persistent missing mandatory fields to the EHR configuration team for correction."
+      },
+      {
+        "title": "Command Center Adoption by Operational Leadership",
+        "description": "A command center dashboard is only valuable if operational leaders change their behavior based on it. If the COO and CNO continue the morning census call rather than using the dashboard, the platform investment is underutilized.",
+        "likelihood": "Medium",
+        "impact": "High",
+        "mitigation": "Design the command center dashboard with operational leadership as co-designers from day one. Deploy the dashboard on large screens in the command center location before the census call is officially discontinued, allowing a 4-week parallel period where both the call and dashboard run — demonstrating that the dashboard is more accurate and timely before removing the call."
+      }
+    ],
+    "deliverables": [
+      {
+        "name": "Hospital Operations Intelligence Platform Architecture and Deployment Plan",
+        "purpose": "Technical design for the real-time ADT streaming platform including Kafka integration, Structured Streaming pipeline, Operational State schema, predictive capacity models, and command center dashboard specifications.",
+        "outline": [
+          "Executive summary and operational ROI model",
+          "HL7 ADT integration architecture (integration engine → Kafka → Structured Streaming)",
+          "Operational State schema design (Census, Bed, Surgery, Staff)",
+          "Gold Metrics layer design (predictive capacity, staffing metrics)",
+          "Unity Catalog HIPAA access control model by role",
+          "Command center dashboard specifications",
+          "Predictive staffing AI architecture",
+          "Facility onboarding process and timeline",
+          "10-week rapid deployment roadmap"
+        ]
+      }
+    ],
+    "executiveSummary": {
+      "sponsorReady": "We are building a real-time hospital operations platform on Databricks that streams HL7 ADT events into a live command center with sub-60-second census accuracy. This platform will eliminate the morning census call, reduce bed turnaround time by 20+ minutes, and predict staffing needs 4-6 hours ahead — generating $2.8M in annual operational savings and directly improving patient flow metrics.",
+      "thirtySecond": "Your census is 4 hours old, your ED patients wait hours for beds because coordinators are calling spreadsheet owners, and your nurses go into overtime because charge nurses can't see tomorrow's census surge coming. Databricks streaming ADT events in real-time fixes all three with a single platform.",
+      "twoMinute": "Every morning your COO and CNO spend 2-3 hours on a census call, collecting numbers by phone from bed coordinators updating spreadsheets. Your ED charge nurse is managing boarding by instinct because the latest bed data is hours old. Your staffing supervisor is calling overtime nurses at 2 PM for the 3 PM shift because they couldn't see the census surge coming. The Hospital Operations Intelligence Platform changes all of this today. HL7 ADT messages from your EHR stream through Databricks Structured Streaming, updating a real-time patient census table within 60 seconds of any admission, transfer, or discharge. The command center dashboard shows live occupancy by unit, predicted census for the next 4-8 hours, available beds by type, and nursing ratio compliance — all updated continuously without any manual input. The moment a patient is discharged, an automated notification goes to environmental services to clean the room — adding 20 minutes back to your average bed turnaround time. Four hours before a predicted census surge, the Staffing AI recommends calling in a float nurse at straight time rather than waiting for the surge and paying overtime. This platform saves $2.8M annually and improves the patient outcomes that drive your Joint Commission accreditation and CMS value-based care performance.",
+      "successIn12Months": [
+        "Real-time census dashboard live across all 8 hospitals with under 60-second latency",
+        "Morning leadership census call eliminated, returning 2 hours daily to COO and CNO",
+        "Bed turnaround time reduced from 62 to under 45 minutes system-wide",
+        "Nursing overtime reduced by 15% through predictive staffing recommendations",
+        "ED boarding time reduced by 20% through real-time bed assignment visibility"
+      ]
+    },
+    "meetingChecklist": [
+      "Calculate the annual nursing overtime cost and the estimated savings from 15% reduction",
+      "Estimate the revenue impact of 20% ED boarding reduction from improved throughput and LWBS patients",
+      "Prepare a live ADT streaming demo using synthetic ADT messages to show census updating in real-time",
+      "Know the customer's EHR system(s) and integration engine to confirm Kafka integration approach",
+      "Have the command center dashboard wireframe ready to show COO and CNO what their morning would look like",
+      "Understand the nursing union contract constraints on staffing schedule changes"
+    ],
+    "nextSteps": [
+      "Schedule an integration engine capability assessment to confirm Kafka publishing approach",
+      "Request a sample HL7 ADT message file from each EHR system for HL7 parser configuration",
+      "Identify a single pilot hospital for the first ADT streaming deployment",
+      "Schedule a command center vision workshop with COO, CNO, and VP Patient Flow",
+      "Deliver a 4-week ADT streaming POC proposal with census dashboard as the deliverable"
+    ],
+    "whiteboardTalkTrack": [
+      "Draw the current state: EHR generating ADT messages → integration engine → bed coordinator phones → manual spreadsheet → 4-hour-old data in a leadership call",
+      "Show the problem cascade: stale census → delayed bed assignment → ED boarding → patient safety and satisfaction impact",
+      "Draw the streaming architecture: EHR → integration engine → Kafka topic → Databricks Structured Streaming → real-time Delta MERGE on census table",
+      "Show the 60-second journey of an ADT A03 (discharge): discharge button clicked → ADT generated → Kafka → Structured Streaming → census MERGE → bed shows available → EVS notification",
+      "Show the command center dashboard: live occupancy heat map, predicted 4-hour census by unit, staffing ratio compliance, OR-PACU connection",
+      "Show the staffing AI: predicted census surge at 3 PM → recommendation at 11 AM → float nurse scheduled at straight time",
+      "Close with the business outcomes: $2.8M savings, better patient outcomes, better staff experience, Joint Commission performance"
+    ],
+    "workshopPlan": [
+      "Morning Session 1 (90 min): Operations walkthrough — shadow a bed coordinator shift to understand the current manual process end-to-end and identify pain points",
+      "Morning Session 2 (60 min): Command center vision — what decisions should be centralized? Who staffs the command center? What would trigger an escalation?",
+      "Afternoon Session 1 (90 min): Technical architecture — ADT streaming design, Operational State schema, dashboard requirements",
+      "Afternoon Session 2 (60 min): Staffing AI requirements — what data does the charge nurse need to act on a staffing recommendation? What are the union constraints?",
+      "Wrap-up (30 min): Pilot facility selection, POC scope, and command center organizational readiness plan"
+    ],
+    "objections": [
+      {
+        "objection": "We already invested in a bed management system. Why do we need another platform?",
+        "response": "Your bed management system is excellent for bed tracking within the BMS data model, but it doesn't integrate your staffing data, surgery schedule, and predictive analytics into a unified operational view. The Databricks platform consumes the bed management system's events as one of its sources and combines them with ADT data, surgery scheduling, and staffing data that the BMS doesn't have access to. The command center dashboard is more complete than anything the BMS can provide on its own."
+      },
+      {
+        "objection": "Our nurses will resist being told by an algorithm when to call in staff.",
+        "response": "The Staffing AI is designed as a recommendation tool, not a mandate. It provides quantitative information to support a decision the charge nurse was already going to make based on experience. The recommendation says 'In 5 hours, this unit is predicted to be at 108% occupancy based on the current admission trajectory — consider calling the float pool now.' The charge nurse still makes the decision. We've seen adoption improve dramatically when nurses realize the recommendations come with the supporting data — they can see why the AI is suggesting what it is and can apply their professional judgment to accept, modify, or reject the recommendation."
+      }
+    ]
+  }
+}

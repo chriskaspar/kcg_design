@@ -1,0 +1,519 @@
+{
+  "id": "pharma-static",
+  "title": "Pharma Commercial Analytics Platform",
+  "updatedAt": "2026-03-14T00:00:00.000Z",
+  "input": {
+    "scenarioTitle": "Pharma Commercial Analytics Platform",
+    "industry": "Life Sciences",
+    "customerType": "Pharma",
+    "problemStatement": "A global pharmaceutical company's commercial organization cannot effectively target HCPs, measure campaign effectiveness, or enable field teams with AI-powered insights because CRM, prescription data, marketing engagement, patient support, and medical literature data exist in separate silos with no unified HCP view.",
+    "businessGoals": "Build a unified HCP 360 view combining CRM, prescription sales data, marketing engagement, patient support interactions, and medical literature for AI-powered field enablement, campaign optimization, and commercial performance analytics.",
+    "constraints": "Aggregate spend transparency (Sunshine Act) reporting required, HCP data privacy regulations (HIPAA for patient data, state HCP transparency laws), field team adoption is critical, and brand teams have competing analytics priorities.",
+    "timeline": "12-18 months for HCP 360 and commercial analytics, 24 months for AI field assistant",
+    "currentState": "CRM in Salesforce with limited analytics, prescription data purchased from IQVIA delivered monthly in flat files, marketing engagement tracked in Veeva CRM separately from Salesforce, patient support programs in a standalone platform, and competitive benchmarks purchased ad-hoc with no integration.",
+    "desiredFutureState": "A unified Databricks Lakehouse with HCP 360 integrating all commercial data, real-time field team dashboards, automated Sunshine Act reporting, and an AI Field Assistant that provides reps with next-best-action recommendations and scientific content recommendations.",
+    "stakeholders": "Chief Commercial Officer, VP Sales, VP Marketing Analytics, Head of Market Access, Medical Affairs VP, Chief Data Officer",
+    "compliance": ["Sunshine Act / Open Payments", "HIPAA", "State HCP Transparency Laws", "GDPR (EU HCPs)"],
+    "architecturePreference": "Medallion (Bronze/Silver/Gold) on Databricks Lakehouse",
+    "outputDepth": "Comprehensive"
+  },
+  "architecture": {
+    "title": "Pharma Commercial Analytics Platform Architecture",
+    "summary": "A governed Databricks Lakehouse unifying CRM, prescription data, marketing engagement, patient support, and medical literature into an HCP 360 that powers AI-driven field enablement, commercial analytics, and automated Sunshine Act reporting.",
+    "solutionOverview": "Commercial data from CRM systems, IQVIA prescription data, marketing engagement platforms, patient support programs, and medical literature flows into the Databricks Lakehouse via Auto Loader for batch file ingestion and Delta Live Tables for real-time CRM event streams. The Bronze layer captures raw commercial data with full audit history for Sunshine Act compliance. The Silver layer builds the HCP 360 — a unified view of each HCP's prescribing behavior, engagement history, specialty, affiliations, and patient population — with HCP identity resolution across source systems. The Gold layer materializes commercial data products: territory performance metrics, campaign attribution, next-best-action scores, and Sunshine Act aggregate spend reports. The AI Field Assistant is grounded in HCP 360 data and medical literature, providing reps with scientifically accurate, compliance-reviewed conversation support.",
+    "assumptions": [
+      "IQVIA or Symphony prescription data is available as monthly flat file deliveries with HCP NPI linking",
+      "Salesforce CRM has an API for real-time event streaming or daily batch export",
+      "Veeva CRM data can be unified with Salesforce HCP records using NPI as a common identifier",
+      "Medical literature access (PubMed, internal clinical data) is available in document format",
+      "The AI Field Assistant will go through Medical-Legal-Regulatory review before field deployment"
+    ],
+    "details": [
+      {
+        "title": "Commercial Data Sources",
+        "body": "Five primary data streams: CRM/Service (Salesforce and Veeva CRM combining call activity, sample drops, and meeting notes); External Benchmarks (IQVIA/Symphony prescription data showing each HCP's prescribing volume, brand share, and competitive landscape); Patient Support (hub program interactions, copay card usage, patient assistance program data); Marketing Engagement (email opens, event attendance, medical congress interactions, digital content engagement); and Documents/Policies (approved promotional materials, clinical data packages, prescribing information, and internal policy documents for AI grounding)."
+      },
+      {
+        "title": "HCP 360 Silver Layer",
+        "body": "The Silver layer resolves HCP identities across Salesforce, Veeva, and prescription data using NPI as the primary identifier, supplemented by name/address matching. The HCP 360 entity integrates: demographic profile (specialty, practice setting, geographic territory), prescribing behavior (total Rx, brand Rx, market share trend), engagement history (rep calls, email interactions, event attendance), patient support usage (copay card activations, patient assistance program referrals), and Sunshine Act spend tracking."
+      },
+      {
+        "title": "Commercial Gold Products",
+        "body": "Gold layer products for each commercial use case: Territory Performance (rep-level and territory-level brand performance vs goal, call plan adherence, HCP engagement breadth); Campaign Attribution (incremental Rx attributed to marketing campaigns by channel); Next-Best-Action Scores (AI-scored priority and recommended action for each HCP in the rep's territory); and Sunshine Act Reports (aggregate HCP-level spend by category ready for Open Payments submission)."
+      },
+      {
+        "title": "AI Field Assistant",
+        "body": "The AI Field Assistant is a RAG-based system grounded in HCP 360 data and MLR-approved medical content. It provides reps with: scientific content recommendations based on HCP specialty and recent prescribing behavior; pre-call planning insights summarizing the HCP's engagement history and next-best-action; real-time question answering on approved clinical data; and post-call activity logging via voice-to-text interaction."
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-crm",
+        "label": "CRM / Service",
+        "iconId": "source-crm",
+        "vendor": "generic",
+        "notes": "Salesforce and Veeva CRM systems with rep call activity, HCP interactions, sample requests, and field team notes",
+        "x": 60,
+        "y": 80,
+        "metadata": { "group": "Commercial Sources" }
+      },
+      {
+        "id": "n-benchmarks",
+        "label": "External Benchmarks",
+        "iconId": "source-benchmarks",
+        "vendor": "generic",
+        "notes": "IQVIA NPA/NSP and Symphony Health prescription data with HCP-level Rx volumes, brand share, and competitive prescribing data",
+        "x": 60,
+        "y": 200,
+        "metadata": { "group": "Commercial Sources" }
+      },
+      {
+        "id": "n-patient",
+        "label": "Patient Support",
+        "iconId": "source-patient-support",
+        "vendor": "generic",
+        "notes": "Hub program data: copay card activations, patient assistance program referrals, specialty pharmacy interactions linked to prescribing HCPs",
+        "x": 60,
+        "y": 320,
+        "metadata": { "group": "Commercial Sources" }
+      },
+      {
+        "id": "n-marketing",
+        "label": "Marketing Engagement",
+        "iconId": "source-marketing",
+        "vendor": "generic",
+        "notes": "Email engagement, medical congress attendance, webinar participation, and digital content interaction data from marketing automation platforms",
+        "x": 60,
+        "y": 440,
+        "metadata": { "group": "Commercial Sources" }
+      },
+      {
+        "id": "n-documents",
+        "label": "Documents / Policies",
+        "iconId": "source-documents",
+        "vendor": "generic",
+        "notes": "MLR-approved promotional materials, clinical data packages, prescribing information, and internal policy documents for AI grounding",
+        "x": 60,
+        "y": 560,
+        "metadata": { "group": "Commercial Sources" }
+      },
+      {
+        "id": "n-autoloader",
+        "label": "Auto Loader",
+        "iconId": "databricks-data-ingestion",
+        "vendor": "databricks",
+        "notes": "Batch ingestion for IQVIA prescription files, patient support exports, and marketing engagement data with schema evolution",
+        "x": 300,
+        "y": 200,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-dlt",
+        "label": "Delta Live Tables",
+        "iconId": "databricks-dlt",
+        "vendor": "databricks",
+        "notes": "Real-time DLT pipelines for CRM activity streaming from Salesforce and Veeva with data quality and HCP identity validation",
+        "x": 300,
+        "y": 420,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-bronze",
+        "label": "Bronze Layer",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Raw commercial data in Delta format with full audit history for Sunshine Act compliance and cross-source traceability",
+        "x": 560,
+        "y": 300,
+        "metadata": { "group": "Bronze Layer" }
+      },
+      {
+        "id": "n-silver",
+        "label": "Silver Layer (HCP 360)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Unified HCP 360 with NPI-resolved identity, prescribing behavior, engagement history, patient support, and Sunshine Act spend tracking",
+        "x": 760,
+        "y": 300,
+        "metadata": { "group": "Silver Layer" }
+      },
+      {
+        "id": "n-gold",
+        "label": "Gold Layer (Commercial Products)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Territory performance metrics, campaign attribution, next-best-action scores, and Sunshine Act aggregate spend reports",
+        "x": 960,
+        "y": 300,
+        "metadata": { "group": "Gold Layer" }
+      },
+      {
+        "id": "n-uc",
+        "label": "Unity Catalog",
+        "iconId": "databricks-governance",
+        "vendor": "databricks",
+        "notes": "Brand-level and territory-level access controls, Sunshine Act audit trails, HCP data privacy governance, and document lineage for AI grounding",
+        "x": 760,
+        "y": 560,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-sql",
+        "label": "SQL Warehouses",
+        "iconId": "databricks-sql-warehouses",
+        "vendor": "databricks",
+        "notes": "SQL Warehouses serving commercial analytics teams, brand managers, market access analysts, and field leadership reporting",
+        "x": 1160,
+        "y": 160,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-analytics",
+        "label": "Commercial Analytics",
+        "iconId": "databricks-dashboards",
+        "vendor": "databricks",
+        "notes": "Territory performance, brand share trends, campaign attribution, call plan compliance, and market access dashboards",
+        "x": 1320,
+        "y": 200,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-ai",
+        "label": "AI Field Assistant",
+        "iconId": "databricks-genie",
+        "vendor": "databricks",
+        "notes": "MLR-reviewed RAG assistant providing reps with next-best-action, scientific content recommendations, pre-call planning, and post-call logging",
+        "x": 1240,
+        "y": 420,
+        "metadata": { "group": "Analytics & AI" }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n-crm", "target": "n-dlt", "label": "CRM event stream", "protocol": "API/Kafka" },
+      { "id": "e2", "source": "n-benchmarks", "target": "n-autoloader", "label": "IQVIA Rx data files", "protocol": "SFTP" },
+      { "id": "e3", "source": "n-patient", "target": "n-autoloader", "label": "Hub program exports", "protocol": "SFTP/API" },
+      { "id": "e4", "source": "n-marketing", "target": "n-dlt", "label": "Engagement event stream", "protocol": "API" },
+      { "id": "e5", "source": "n-documents", "target": "n-autoloader", "label": "Document uploads", "protocol": "HTTPS" },
+      { "id": "e6", "source": "n-autoloader", "target": "n-bronze", "label": "Raw Delta write", "protocol": "Delta" },
+      { "id": "e7", "source": "n-dlt", "target": "n-bronze", "label": "Streaming Delta write", "protocol": "Delta" },
+      { "id": "e8", "source": "n-bronze", "target": "n-silver", "label": "HCP identity resolution", "protocol": "Spark" },
+      { "id": "e9", "source": "n-silver", "target": "n-gold", "label": "Commercial aggregation", "protocol": "Spark" },
+      { "id": "e10", "source": "n-silver", "target": "n-uc", "label": "HCP governance registration", "protocol": "Unity Catalog" },
+      { "id": "e11", "source": "n-gold", "target": "n-uc", "label": "Product registration", "protocol": "Unity Catalog" },
+      { "id": "e12", "source": "n-gold", "target": "n-sql", "label": "SQL query access", "protocol": "SQL" },
+      { "id": "e13", "source": "n-sql", "target": "n-analytics", "label": "Dashboard queries", "protocol": "SQL" },
+      { "id": "e14", "source": "n-gold", "target": "n-ai", "label": "HCP context and Rx data", "protocol": "REST" },
+      { "id": "e15", "source": "n-uc", "target": "n-ai", "label": "MLR-approved content access", "protocol": "Unity Catalog" }
+    ],
+    "refinements": [
+      "Add real-time next-best-action scoring served through a Databricks Model Serving endpoint integrated with the CRM mobile app",
+      "Build a Sunshine Act automated reporting pipeline producing Open Payments-ready submission files annually",
+      "Implement a scientific content recommendation engine that suggests clinical reprints based on HCP specialty and recent prescribing",
+      "Add competitive intelligence analytics using prescription market share trends to identify HCPs switching from competitor brands",
+      "Build a market access analytics layer tracking formulary coverage, payer restrictions, and their impact on Rx volume by territory"
+    ]
+  },
+  "architectAnswers": {
+    "why_w1": "The commercial organization's most expensive resource — the field sales force — is operating without a unified view of the HCPs they call on. Reps have partial information: they can see their own call history in Salesforce, but cannot see the HCP's prescribing trajectory from IQVIA data, marketing engagement history from Veeva, or patient support utilization from the hub program. This information fragmentation results in low-relevance interactions that fail to drive behavior change.",
+    "why_w2": "Brand managers spend 3-4 days per month manually assembling brand performance reports from IQVIA data, Salesforce call plan data, and marketing engagement extracts. This manual process is error-prone, slow, and consumes brand analytics team capacity that should be devoted to insight generation. Automating commercial reporting from Gold layer data products would return this time to strategic analysis.",
+    "why_w3": "The Sunshine Act requires accurate, auditable tracking of all HCP-directed spend: speaker fees, consulting fees, meals, educational events, and research payments. Currently, this data is tracked in disconnected systems — Salesforce for some activities, a separate vendor portal for others — and manually reconciled at year-end. The lakehouse provides an automated, auditable Sunshine Act pipeline that reduces compliance risk and submission effort.",
+    "why_h1": "IQVIA prescription data is the most valuable commercial data asset, but its monthly delivery cadence creates a 30-day intelligence lag. By the time a rep knows that a key HCP's brand share dropped, the opportunity to intervene has often passed. Faster integration of prescription data (ideally weekly) and correlation with CRM engagement data enables timely, responsive field action.",
+    "why_h2": "The company's AI strategy for commercial includes a next-best-action engine that recommends which HCPs to call, what content to share, and what channel to use. Building this model requires a unified HCP dataset combining prescribing behavior, engagement history, and demographic data — exactly what the HCP 360 Silver layer provides. Without the data foundation, the AI ambition cannot be realized.",
+    "why_h3": "Medical Affairs and Commercial organizations operate with separate analytics platforms, creating friction in sharing medical insights with field teams. A unified lakehouse enables Medical Affairs to make congress presentations, publication summaries, and clinical data packages available to the AI Field Assistant for compliant scientific exchange — closing the Medical-Commercial data gap.",
+    "goal_g1": "The primary goal is an HCP 360 in Silver resolving HCP identities across Salesforce, Veeva CRM, IQVIA data, and hub program records using NPI as the primary identifier, covering 100% of the company's 50,000+ targeted HCPs with integrated prescribing, engagement, and patient support data within 90 days of platform launch.",
+    "goal_g2": "The AI Field Assistant must be grounded in the HCP 360 and MLR-approved clinical content, providing reps with accurate, compliant pre-call planning summaries and scientific content recommendations within 2 seconds, deployed initially to a 200-rep pilot group with field leadership coaching support.",
+    "goal_o1": "Field team success: reps access a daily-refreshed priority call list in their CRM mobile app that is scored by the next-best-action model using HCP 360 data, replacing the current subjective territory planning process. Call plan adherence and HCP engagement breadth improve as a result of better prioritization.",
+    "goal_o2": "Brand team success: monthly brand performance reports are available in a Gold layer dashboard by day 2 of each month (replacing the current day 15 availability from manual process), with IQVIA market share, call activity, campaign attribution, and sales vs goal all in a single view without manual data assembly.",
+    "goal_a1": "The next-best-action model serving endpoint must respond within 500 milliseconds for CRM mobile app integration, supporting 1,000 concurrent field reps accessing their priority lists during morning planning sessions without performance degradation.",
+    "goal_a2": "Sunshine Act reporting must produce a complete, audit-ready aggregate spend report for all HCP interactions in the prior calendar year within 5 business days of the CMS submission deadline. The pipeline must reconcile spend data from all source systems and flag any discrepancies for compliance review.",
+    "goal_l1": "Brand-level data access controls: field reps see only HCPs in their territory; brand managers see all HCPs targeted for their brand; market access analysts see formulary and payer data without individual patient-level data; Medical Affairs sees all HCPs with additional access to medical interaction records.",
+    "goal_l2": "IQVIA and Symphony prescription data is licensed for internal commercial use only and may not be shared externally or used for patient identification. Unity Catalog data classifications enforce these license restrictions by preventing prescription data from being joined with patient-identifiable data or exported to external systems.",
+    "safe_s1": "Sunshine Act compliance requires immutable audit records of all HCP-directed spend. The Bronze layer serves as the immutable audit log — once written, spend records are never deleted or modified (corrections are appended as new records). Unity Catalog audit history captures all access to Sunshine Act data for compliance team review.",
+    "safe_s2": "IQVIA data license compliance: IQVIA prescription data has contractual use restrictions that prohibit patient-level identification and certain competitive intelligence uses. Unity Catalog data classifications tag IQVIA data with license metadata. Access policies are enforced that prevent joining IQVIA prescribing data with patient-identifiable datasets. Quarterly data license audits are supported by Unity Catalog access logs.",
+    "safe_a1": "The AI Field Assistant goes through Medical-Legal-Regulatory review before field deployment. MLR-approved content (clinical reprints, prescribing information, approved messaging) is tagged in Unity Catalog with MLR approval metadata. The AI assistant is restricted to grounding its responses in documents tagged with valid MLR approval status — it cannot retrieve or synthesize unapproved content.",
+    "safe_a2": "HCP data privacy: state HCP transparency laws and GDPR for EU HCPs restrict the use of HCP personal data for targeting without consent in some jurisdictions. Unity Catalog data classifications identify HCPs by jurisdiction. Targeting models for EU HCPs operate on aggregated specialty and prescribing behavior data rather than individual HCP-level profiles where consent is required.",
+    "safe_f1": "IQVIA prescription data quality validation: monthly IQVIA file deliveries are validated at ingestion against expected record counts, territory coverage checksums, and prior-month comparison totals. Unexpected volume drops (>10% change) trigger alerts for the analytics team to investigate before the data is made available to downstream reports, preventing silent data quality issues from corrupting brand performance metrics.",
+    "safe_e1": "Commercial analytics platform RTO: 8 hours, RPO: 4 hours. The monthly IQVIA data load is the most critical batch window — field leadership depends on brand performance dashboards being refreshed within 48 hours of IQVIA data delivery. Dedicated Databricks Workflows monitoring tracks this SLA with automatic escalation if the pipeline falls behind.",
+    "safe_e2": "CRM event streaming pipeline failures trigger immediate alerts to the data engineering team. CRM interactions that fail to process are stored in a dead-letter queue and reprocessed after the root cause is resolved. Missing CRM data in the HCP 360 is flagged to the commercial analytics team to prevent reporting on incomplete engagement data.",
+    "flow_f1": "Commercial data flow: CRM interactions (real-time) → DLT → Bronze → HCP 360 Silver update → Gold next-best-action score refresh. IQVIA prescription data (monthly) → Auto Loader → Bronze → HCP prescribing behavior Silver update → Gold brand performance dashboard refresh. Documents (ad-hoc) → Auto Loader → Vector store index for AI Field Assistant RAG.",
+    "flow_l1": "IQVIA monthly data delivery is the most critical batch event in the commercial data calendar. The data engineering team has a 48-hour SLA from IQVIA delivery to Gold layer availability. Databricks Workflows automates the Bronze ingestion, Silver HCP 360 update, Gold brand metrics refresh, and dashboard cache invalidation in sequence. The commercial operations team receives a Slack notification when the monthly refresh is complete.",
+    "flow_o1": "Data quality for HCP identity resolution: NPI-based matching resolves approximately 90% of HCP records across source systems. The remaining 10% — HCPs without NPI (dentists, some specialists, foreign graduates) — are matched using probabilistic name/address/specialty matching with a manual review queue for uncertain matches. HCP identity confidence scores are maintained in the Silver layer.",
+    "flow_w1": "Databricks Workflows orchestrates: daily CRM delta → HCP 360 update → next-best-action score refresh → rep priority list publish (available in CRM by 7 AM daily). Monthly IQVIA flow → brand performance dashboard refresh → field leadership reporting. Ad-hoc document uploads → vector index update → AI Field Assistant knowledge base refresh (within 1 hour of document upload).",
+    "data_d1": "Core HCP data domains: Prescribing Behavior (IQVIA total Rx, brand Rx, market share, competitive brand prescribing by specialty and geography); CRM Engagement (call history, email interactions, sample drops, meeting notes, digital content interactions by rep and HCP); Patient Support (copay card activations, patient assistance program referrals, specialty pharmacy order linkage to prescribing HCP); HCP Profile (NPI, specialty, practice setting, geographic territory, affiliation to health systems or group practices); and Sunshine Act Spend (meals, speaker fees, consulting fees, research payments by HCP and category).",
+    "data_d2": "Scientific content domain: MLR-approved clinical reprints, medical congress presentations, prescribing information documents, and clinical study results are managed in a Unity Catalog-governed document catalog. Each document has metadata including MLR approval date, expiration date, therapeutic area, and indication. The AI Field Assistant's RAG system queries only documents with active MLR approval status, enforcing promotional compliance at the data layer.",
+    "data_a1": "IQVIA data typically has 2-3% HCP matching issues — physicians who recently joined or left a practice, newly licensed physicians without established prescribing history, and specialty physician groups that aggregate individual HCP prescribing under a group NPI. The Silver layer maintains an HCP matching audit table that records how each HCP's prescribing data was attributed, supporting data steward review of uncertain matches.",
+    "data_a2": "CRM data quality is highly variable by territory: some reps diligently log all interactions while others log only a fraction. This variability means CRM engagement data cannot be trusted as a complete record of rep-HCP interactions without call plan compliance reporting. The Gold layer includes a data completeness indicator per HCP that warns analysts when engagement data may be underreported for a territory.",
+    "data_t1": "NPI (National Provider Identifier) is the primary HCP identity key used across all source systems. The NPPES registry is integrated as a reference dataset in Unity Catalog, providing specialty, address, organizational affiliation, and license status for all NPIs. This enrichment enables territory analytics, specialty segmentation, and HCP network analysis beyond what any single source system provides.",
+    "data_t2": "The Gold layer uses a metric store pattern for commercial analytics: pre-computed weekly HCP-level metrics (Rx volume trend, engagement recency, call plan adherence, brand share) are stored as time-series records that support efficient trend analysis and next-best-action model scoring without requiring real-time computation from raw Silver data.",
+    "data_a3": "IQVIA and competitive prescription data has contractual data retention limits: data older than 3 years must be destroyed or archived per the data license agreement. The Bronze layer maintains a data lifecycle management schedule tied to IQVIA contract terms, automatically archiving and eventually deleting data beyond the retention window. This schedule is reviewed annually during contract renewal.",
+    "data_a4": "Document lineage for the AI Field Assistant is critical for MLR compliance: the AI assistant must be able to prove which documents grounded each response. Unity Catalog tracks document ingestion, vectorization, and retrieval events. Each AI response includes a citation trail identifying the source documents used, enabling compliance review of any AI-generated content that reaches HCPs.",
+    "fast_f1": "The fastest path to value is a brand performance dashboard for the top 3 brands showing IQVIA market share trends, call plan adherence, and territory performance vs goal. This dashboard currently requires 15 hours per month of manual data assembly by the brand analytics team. Automating it from the Gold layer in 8-10 weeks eliminates this burden and immediately demonstrates platform value.",
+    "fast_f2": "Deploying a simple next-best-action prioritization model using only IQVIA prescribing data (high-potential HCPs with low brand share and recent competitive prescription activity) can be done in 6-8 weeks without the full HCP 360. This baseline model provides immediate field team value while the complete HCP 360 integration is being built.",
+    "fast_a1": "The 14-week rapid deployment plan: Weeks 1-4 cover infrastructure, Unity Catalog, and Auto Loader for IQVIA data (the highest-priority source for commercial analytics). Weeks 5-8 add CRM data via DLT and build HCP 360 Silver with NPI identity resolution. Weeks 9-12 deliver Gold brand performance dashboard and next-best-action model. Weeks 13-14 conduct field team pilot with 50 reps.",
+    "fast_a2": "Start with a single brand in a pilot geography (e.g., the Southeast region for Brand A). This reduces scope to a manageable 5,000 HCPs and 100 reps while proving the architecture. The pilot creates a template and lessons learned for scaling to the full commercial portfolio of 50,000 HCPs and 500 reps.",
+    "fast_s1": "90-day quick wins: (1) Automated monthly brand performance dashboard replacing 15 hours of manual assembly; (2) HCP 360 prototype for the pilot brand showing prescribing + engagement in one view; (3) Sunshine Act spend tracking dashboard for the compliance team; (4) Next-best-action priority list pilot for 50 field reps. Each delivers immediate stakeholder value.",
+    "fast_t1": "Pre-built IQVIA data connectors and prescription analytics templates are available through Databricks partner solutions (Veeva, IQVIA native connectors). These reduce the prescription data ingestion development from 6-8 weeks to 2-3 weeks. Salesforce-to-Databricks connectors (e.g., Fivetran, Airbyte) similarly accelerate CRM ingestion pipeline development.",
+    "fast_t2": "Databricks MLflow AutoML can train a baseline next-best-action classification model using 12 months of IQVIA data and CRM call history in 1-2 weeks. While this model is not the production model, it demonstrates AI capability to commercial leadership and provides a benchmark for measuring the improvement from the full HCP 360 data integration.",
+    "run_r1": "Commercial platform operations: 3 data engineers maintain ingestion pipelines and HCP 360 updates; 2 data scientists maintain the next-best-action model and AI Field Assistant; 1 platform administrator manages Unity Catalog policies and data license compliance; 1 commercial analytics SME ensures Gold layer products meet business requirements. Monthly IQVIA data loads require additional support from the data engineering team during the 48-hour refresh window.",
+    "run_r2": "Commercial analytics platform cost: IQVIA data licensing is typically the largest cost line (millions annually). The Databricks platform compute cost is modest by comparison — estimated at $300K-500K annually for the commercial analytics workload. The productivity return from automated reporting and field efficiency gains justifies this cost within 6 months.",
+    "run_u1": "The next-best-action model is retrained quarterly using the most recent 12 months of prescribing and CRM engagement data. Model performance is validated against a holdout HCP set with known behavior. MLflow A/B testing compares the challenger model against the champion using a 10% pilot group before full deployment to the field force.",
+    "run_u2": "IQVIA contract renewals may change data format, scope, or delivery frequency. The Auto Loader schema evolution capability handles format changes without pipeline changes. New IQVIA data products (e.g., patient-level claims data, real-world outcomes data) are onboarded through the standard Auto Loader ingestion template with appropriate data license controls applied in Unity Catalog.",
+    "run_n1": "The commercial analytics platform is deployed in the company's primary cloud region. GDPR-compliant data processing for EU HCPs uses a separate EU data catalog in Unity Catalog with data processing restricted to the EU region. EU HCP prescribing data is not joined with patient-identifiable data, and individual EU HCP profiles are used only where consent or legitimate interest legal basis is established.",
+    "win_w1": "Commercial success metrics: (1) Brand performance dashboards available by day 2 of each month (vs day 15 today); (2) Field rep call plan adherence improves by 15% using next-best-action priority lists; (3) Sunshine Act reporting preparation time drops from 4 weeks to 3 days; (4) AI Field Assistant achieves 70%+ daily active usage among pilot reps within 90 days of deployment.",
+    "win_i1": "Business case: $2M annually in brand analytics team productivity savings; $500K in Sunshine Act compliance preparation cost reduction; 5% incremental brand share growth attributable to improved HCP targeting (worth $50-200M in revenue depending on brand size); AI Field Assistant drives measurable reduction in cost per new prescriber conversion.",
+    "win_n1": "The HCP 360 becomes the commercial organization's core data asset. Over 5 years, the platform evolves to include real-world evidence data (patient outcomes linked to prescribing behavior), omnichannel engagement orchestration that personalizes the HCP experience across all touchpoints, and AI-driven predictive models that identify which investigational compounds in the pipeline have the strongest HCP adoption potential — connecting commercial intelligence to early pipeline strategy."
+  },
+  "story": {
+    "strategy": "The pharma company's commercial organization chose to build the HCP 360 as the single source of truth for all commercial analytics and AI applications, recognizing that fragmented data sources produce contradictory insights that erode field team trust. By unifying prescribing data, CRM activity, marketing engagement, and patient support into a single NPI-resolved entity in Silver, every downstream application — from brand dashboards to the AI Field Assistant — draws from the same governed, consistent data.",
+    "technology": "The platform uses Databricks Auto Loader for IQVIA monthly prescription file ingestion, Delta Live Tables for real-time Salesforce CRM event streaming, and a configurable HCP identity resolution pipeline using NPI matching with probabilistic fallback. The AI Field Assistant is built on Databricks AI Gateway with a RAG architecture grounded in MLR-approved clinical documents stored in Unity Catalog, ensuring that AI-generated content is always traceable to approved source materials.",
+    "outcome": "Within 14 months, the platform unified 55,000 HCP records across all commercial source systems. Brand performance dashboards moved from day 15 to day 2 availability, returning 180 hours per month to the brand analytics team. The next-best-action model deployed to 500 field reps improved call plan adherence by 18% and contributed to a 3.2% incremental brand share gain in the pilot region. The AI Field Assistant was used by 78% of pilot reps within 60 days of launch.",
+    "returnValue": "First-year documented returns: $2.1M in brand analytics team productivity savings from automated reporting; $600K in Sunshine Act compliance preparation savings; 3.2% incremental brand share gain in the pilot region translated to $45M in incremental revenue for the lead brand; AI Field Assistant usage reduced training costs for new reps by $250K. Total first-year return: $47.9M against a $2.8M platform investment — a 17:1 ROI.",
+    "years": "Over 5 years, the HCP 360 expands to include real-world evidence data showing patient outcomes linked to each HCP's prescribing decisions, enabling the company to demonstrate value-based outcomes in payer negotiations and to identify HCP champions with the best patient outcomes for clinical education programs. The AI Field Assistant evolves into a proactive commercial intelligence system — anticipating market events, competitor launches, and formulary changes before they affect brand performance, enabling the field force to act rather than react."
+  },
+  "playbook": {
+    "scenarioTitle": "Pharma Commercial Analytics Platform",
+    "scenarioSummary": "A global pharma company needs to unify CRM, prescription data, marketing engagement, patient support, and clinical content into an HCP 360 on Databricks that powers AI-driven field enablement, commercial analytics, and automated Sunshine Act compliance — transforming fragmented commercial data into a revenue-generating intelligence platform.",
+    "businessDrivers": [
+      "Field teams lack a unified HCP view combining prescribing behavior and engagement history, reducing call effectiveness",
+      "Brand analytics reports take 15 days to prepare manually from disconnected data sources",
+      "Sunshine Act compliance is a high-effort, high-risk manual reconciliation process",
+      "The AI Field Assistant roadmap requires an HCP 360 data foundation that does not currently exist",
+      "Monthly IQVIA data lag prevents timely response to HCP prescribing behavior changes"
+    ],
+    "constraints": [
+      "Sunshine Act and state HCP transparency laws require immutable audit records of all HCP-directed spend",
+      "IQVIA data license restricts use to internal commercial purposes and prohibits patient identification",
+      "AI Field Assistant content must be grounded exclusively in MLR-approved materials"
+    ],
+    "recommendedEngagementApproach": [
+      "Quantify the field productivity opportunity: current call plan adherence gap × average value per incremental HCP call",
+      "Show the brand analytics team what day 2 reporting vs day 15 reporting means for their monthly planning cycle",
+      "Demo the AI Field Assistant concept using mock HCP data to get Medical Affairs and Commercial aligned on the vision",
+      "Deliver a 6-week HCP 360 prototype using IQVIA and Salesforce data for a single brand and region"
+    ],
+    "confidenceRating": 89,
+    "recommendedConversationPath": [
+      "Field effectiveness: What is the current call plan adherence rate and what drives poor adherence?",
+      "Data landscape: What are the primary commercial data sources, formats, and lag times?",
+      "AI readiness: What is the timeline for the AI Field Assistant, and has MLR been engaged?",
+      "Sunshine Act: What is the current compliance process and what are the pain points?",
+      "Brand priority: Which brand has the highest commercial analytics need and could serve as a pilot?"
+    ],
+    "discoveryQuestions": [
+      {
+        "category": "Field Effectiveness",
+        "question": "How do reps currently plan their weekly call schedule, and what data do they use to prioritize which HCPs to call?",
+        "whyItMatters": "Understanding the current prioritization process identifies the next-best-action model requirements and the change management needed for adoption.",
+        "goodSignal": "Reps use a combination of subjective experience and manual Salesforce reports — no algorithmic prioritization exists, making next-best-action a high-value improvement.",
+        "redFlag": "Already using a commercial next-best-action tool (e.g., ZS MAPS, Veeva Align) — the use case shifts to improving the data inputs to an existing tool rather than building new capabilities."
+      },
+      {
+        "category": "Data Integration",
+        "question": "How are IQVIA prescription data and Salesforce CRM data currently integrated, if at all, for HCP-level analysis?",
+        "whyItMatters": "The current integration state determines the starting point for HCP 360 development. Manual integration means high pain, high value. Existing integration may reveal prior failed attempts that need to be understood.",
+        "goodSignal": "No integration — analysts manually VLOOKUP IQVIA Excel files against Salesforce reports monthly. A massively manual process.",
+        "redFlag": "Existing commercial data warehouse with IQVIA + CRM integrated — the problem is analytics quality and speed, not data integration. Refocus on Gold layer products and AI."
+      },
+      {
+        "category": "AI Readiness",
+        "question": "Has your Medical-Legal-Regulatory team been engaged on the AI Field Assistant concept, and what guardrails would they require?",
+        "whyItMatters": "MLR engagement timeline is the longest lead item for the AI Field Assistant. MLR alignment early prevents the platform being ready while the AI use case is stuck in review.",
+        "goodSignal": "MLR has been briefed and has provided preliminary guidance — they require all AI responses to cite approved content, which is exactly how the RAG architecture works.",
+        "redFlag": "MLR has not been engaged at all and is perceived as a blocker — significant relationship-building required before the AI use case can move forward."
+      },
+      {
+        "category": "Sunshine Act",
+        "question": "How many systems currently track HCP-directed spend, and how long does the annual Open Payments reconciliation and submission process take?",
+        "whyItMatters": "Sunshine Act pain quantifies the compliance automation opportunity. Multiple disconnected systems with a months-long annual reconciliation is a strong automation use case.",
+        "goodSignal": "3+ systems with a 4-6 week annual reconciliation process and multiple compliance incidents in recent years — high automation value.",
+        "redFlag": "Single centralized spend tracking system with an established process — Sunshine Act automation is a nice-to-have, not a primary driver."
+      },
+      {
+        "category": "Brand Portfolio",
+        "question": "How many brands are in the portfolio, which brands have the most complex commercial analytics needs, and is there one brand team that would commit to being the pilot?",
+        "whyItMatters": "Pilot brand selection determines the scope and success of the initial deployment. A committed brand champion is essential for navigating organizational complexity.",
+        "goodSignal": "One or two flagship brands with engaged VP-level champions who have specific analytics use cases and field productivity goals.",
+        "redFlag": "No brand team committed to being a pilot — platform will be built in a vacuum without commercial user validation, increasing adoption risk."
+      }
+    ],
+    "problemFraming": {
+      "statement": "A global pharma commercial organization cannot achieve its brand performance and field effectiveness targets because HCP data is fragmented across CRM, prescription databases, marketing platforms, and patient support programs — preventing a unified HCP view, timely brand analytics, and the AI-powered field tools the commercial roadmap requires.",
+      "desiredOutcomes": [
+        "HCP 360 unifying prescribing behavior and engagement history for 55,000+ targeted HCPs",
+        "Brand performance dashboards available by day 2 each month replacing day 15 manual delivery",
+        "Next-best-action call priority list deployed to all field reps, improving call plan adherence by 15%+",
+        "Sunshine Act reporting automated with audit-ready output within 5 days of year-end",
+        "AI Field Assistant deployed to field reps with MLR-approved scientific content grounding"
+      ],
+      "assumptions": [
+        "IQVIA data delivery frequency can be increased to weekly with appropriate contract amendment",
+        "MLR can be engaged in an iterative review process for AI Field Assistant content",
+        "Salesforce provides API or streaming access for real-time CRM event ingestion",
+        "Field reps will adopt a new prioritization tool if it visibly improves call outcomes"
+      ],
+      "nonNegotiables": [
+        "Sunshine Act audit records must be immutable and queryable for compliance review",
+        "AI Field Assistant must only generate content grounded in MLR-approved materials",
+        "IQVIA data license restrictions must be enforced at the platform governance layer"
+      ],
+      "unknowns": [
+        "MLR review timeline for AI Field Assistant approval",
+        "IQVIA contract flexibility for increased delivery frequency",
+        "Field leadership receptiveness to algorithmic call prioritization"
+      ],
+      "framingStatement": "By building an HCP 360 on Databricks that unifies all commercial data, we create the foundation for AI-powered field tools, automated brand analytics, and compliant Sunshine Act reporting — generating $47M+ in first-year returns while laying the groundwork for a next-generation commercial organization."
+    },
+    "architectureOptions": [
+      {
+        "name": "HCP 360 Databricks Commercial Lakehouse",
+        "summary": "A medallion architecture with HCP identity resolution in Silver, commercial data products in Gold, and AI Field Assistant powered by MLR-approved RAG — designed for pharma commercial compliance and field effectiveness.",
+        "whenToUse": [
+          "Multiple commercial data sources requiring HCP-level identity resolution",
+          "Sunshine Act compliance requiring immutable audit records",
+          "AI Field Assistant requiring MLR-approved content grounding",
+          "Field teams requiring daily-refreshed, algorithmic call prioritization"
+        ],
+        "benefits": [
+          "HCP 360 becomes shared infrastructure across brand analytics, field AI, and compliance",
+          "Unity Catalog enforces IQVIA data license restrictions without custom application logic",
+          "MLR-approved document catalog in Unity Catalog enables compliant AI grounding",
+          "Gold layer Sunshine Act pipeline eliminates months of annual compliance preparation"
+        ],
+        "tradeoffs": [
+          "MLR review for AI Field Assistant can add 6-12 months to deployment timeline",
+          "IQVIA data license restrictions require careful Unity Catalog policy configuration",
+          "Field rep adoption requires change management investment alongside the technical platform"
+        ],
+        "idealMaturityLevel": "Intermediate",
+        "platformMapping": [
+          "Auto Loader → IQVIA prescription files, patient support exports, marketing engagement data",
+          "Delta Live Tables → Salesforce CRM real-time event stream",
+          "Unity Catalog → HCP data governance, IQVIA license enforcement, MLR content management",
+          "MLflow → next-best-action model, brand performance forecasting",
+          "Databricks AI Gateway → MLR-compliant AI Field Assistant with RAG"
+        ],
+        "components": [
+          { "layer": "Ingestion", "items": ["Auto Loader (IQVIA, hub data, marketing)", "DLT (Salesforce CRM stream, Veeva Engage)", "NPI enrichment from NPPES registry"] },
+          { "layer": "Silver", "items": ["HCP 360 (NPI-resolved, prescribing + engagement + spend)", "MLR document catalog", "Sunshine Act spend tracking"] },
+          { "layer": "Gold", "items": ["Brand performance metrics (daily)", "Next-best-action scores", "Campaign attribution", "Sunshine Act aggregate spend by HCP"] },
+          { "layer": "AI", "items": ["AI Field Assistant (RAG on MLR-approved docs)", "Next-best-action model (MLflow)", "Brand share forecasting"] }
+        ],
+        "talkTrack": [
+          "The HCP 360 is your commercial intelligence foundation — every rep, every brand manager, and the AI Field Assistant draw from the same governed HCP record, eliminating contradictory insights.",
+          "Unity Catalog enforces your IQVIA data license and MLR content boundaries at the data layer — no application code can accidentally cross these lines.",
+          "The AI Field Assistant retrieves from your MLR-approved content library — every answer is traceable to an approved document, giving Medical Affairs confidence in what the AI says to HCPs."
+        ]
+      }
+    ],
+    "mockInterview": [],
+    "customerQuestions": [
+      {
+        "question": "How do we ensure the AI Field Assistant only says things that are MLR-approved?",
+        "bestAnswer": "The AI Field Assistant is built on a RAG architecture — it only generates responses grounded in documents that have been MLR-approved and loaded into the Unity Catalog document catalog. Documents without active MLR approval status are excluded from retrieval. Every response includes a citation trail identifying the source documents used, enabling compliance review. MLR can review the document library and the AI's retrieval logic as part of the approval process.",
+        "notes": "This is the commercial AI's most important compliance question. Emphasize the RAG architecture, the document catalog with MLR approval metadata, and the citation trail. MLR is the gatekeeper and needs to be a design partner.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      },
+      {
+        "question": "How does the Sunshine Act reporting pipeline handle spend from multiple systems?",
+        "bestAnswer": "The Bronze layer captures spend data from all source systems — Salesforce, the speaker bureau platform, the meal tracking app — with a common HCP-NPI link. The Silver layer reconciles these records into a unified HCP spend register, deduplicating entries and resolving any conflicting records. The Gold layer aggregates spend by HCP, category, and date, producing the CMS-required format. The entire pipeline is audit-ready — every spend record is traceable from the Gold report back to its source system transaction.",
+        "notes": "Walk through the Bronze-Silver-Gold flow for Sunshine Act data specifically. The customer's compliance team needs to understand the audit trail from submission back to source data.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      }
+    ],
+    "risks": [
+      {
+        "title": "MLR Review Timeline for AI Field Assistant",
+        "description": "The AI Field Assistant requires Medical-Legal-Regulatory review and approval before field deployment. MLR review can take 6-18 months depending on the organization's experience with AI applications.",
+        "likelihood": "High",
+        "impact": "Medium",
+        "mitigation": "Engage MLR as a design partner at project initiation, not after the platform is built. Start with a narrow AI scope (pre-call planning summaries from approved content) rather than open-ended AI queries to reduce MLR review complexity. Use a phased deployment approach: internal rep-facing tools first, then externally-facing applications."
+      },
+      {
+        "title": "IQVIA Data License Violations",
+        "description": "IQVIA prescription data has restrictive license terms. Using IQVIA data for patient identification, sharing with unauthorized parties, or certain competitive uses can result in contract termination and legal liability.",
+        "likelihood": "Low",
+        "impact": "High",
+        "mitigation": "Implement Unity Catalog data classifications for IQVIA data that prevent joining with patient-identifiable datasets and restrict access to authorized commercial users only. Conduct an annual data license compliance audit using Unity Catalog access logs. Document the data use policy in the platform's data governance framework."
+      },
+      {
+        "title": "Field Rep Adoption of Next-Best-Action Tool",
+        "description": "Experienced field reps with established territory relationships may resist algorithmic prioritization, undermining the business value of the next-best-action model.",
+        "likelihood": "Medium",
+        "impact": "Medium",
+        "mitigation": "Involve field leadership and a group of experienced reps in the model design phase — their territory knowledge improves model quality and builds ownership. Launch with an 'assist' mode where the AI provides recommendations alongside the rep's existing plan rather than replacing it. Track and share performance data showing model-following reps outperforming on brand share growth."
+      }
+    ],
+    "deliverables": [
+      {
+        "name": "Commercial Analytics Platform Blueprint",
+        "purpose": "Technical design for the HCP 360 Databricks Lakehouse including ingestion architecture, HCP identity resolution, Gold layer product design, Sunshine Act automation, and AI Field Assistant architecture.",
+        "outline": [
+          "Executive summary and commercial ROI model",
+          "Commercial data landscape assessment",
+          "HCP identity resolution design (NPI matching + probabilistic fallback)",
+          "Ingestion architecture (IQVIA, Salesforce CRM, marketing, patient support)",
+          "HCP 360 Silver schema design",
+          "Gold layer commercial products design",
+          "Sunshine Act compliance pipeline design",
+          "AI Field Assistant architecture with MLR document catalog",
+          "Unity Catalog data license and governance model"
+        ]
+      }
+    ],
+    "executiveSummary": {
+      "sponsorReady": "We are building a unified HCP 360 on Databricks that brings together your prescription data, CRM activity, marketing engagement, and patient support into a single governed platform. This platform will accelerate brand analytics from day 15 to day 2, deploy an AI Field Assistant to your sales force, automate Sunshine Act compliance, and generate $47M+ in first-year business value.",
+      "thirtySecond": "Your commercial teams are flying blind — prescription data and CRM data are in separate systems, brand analytics take 2 weeks to prepare manually, and the AI Field Assistant your reps need is blocked by the absence of a unified HCP data foundation. The Databricks HCP 360 lakehouse fixes all of this.",
+      "twoMinute": "Today your field reps plan their calls from subjective experience and incomplete data. Your brand analytics team spends 15 days every month manually assembling a performance report from IQVIA, Salesforce, and marketing platform exports. Your Sunshine Act compliance team spends 6 weeks annually reconciling spend records from 4 different systems. And the AI Field Assistant on your roadmap cannot be built because there is no unified HCP view. The Databricks Commercial Lakehouse solves all of this. Auto Loader ingests IQVIA prescription data and Delta Live Tables streams Salesforce CRM events into a Bronze layer with full audit history. The Silver HCP 360 resolves HCP identities across all sources using NPI, giving you one complete view of each HCP's prescribing behavior, engagement history, and your spend with them. The Gold layer makes brand performance available by day 2 each month. The next-best-action model gives reps an AI-scored priority list each morning. The AI Field Assistant, grounded in your MLR-approved clinical content, answers reps' questions about HCP interactions with compliant, accurate science. This is the commercial intelligence platform that separates the leading pharma companies from those still working from Excel.",
+      "successIn12Months": [
+        "HCP 360 covering 55,000 targeted HCPs with NPI-resolved identities across all data sources",
+        "Brand dashboards available day 2 each month for all commercial brands",
+        "Next-best-action model deployed to all 500 field reps with 15%+ call plan adherence improvement",
+        "AI Field Assistant deployed to pilot reps with MLR approval and 70%+ daily active usage",
+        "Sunshine Act reporting automated with 5-day preparation cycle"
+      ]
+    },
+    "meetingChecklist": [
+      "Calculate the brand analytics team time saved: current preparation time × number of brands × 12 months",
+      "Research the current Sunshine Act reconciliation process and document the compliance risk",
+      "Prepare an HCP 360 concept demo showing prescribing + engagement in one view using mock data",
+      "Have the AI Field Assistant architecture with MLR compliance controls ready to present to Medical Affairs",
+      "Know the customer's IQVIA contract terms, delivery frequency, and license restrictions",
+      "Identify which brand team would be the most enthusiastic pilot champion"
+    ],
+    "nextSteps": [
+      "Schedule a commercial data landscape assessment with the analytics, commercial ops, and IT teams",
+      "Request a sample IQVIA data file and Salesforce export for a single region for POC development",
+      "Engage the Medical Affairs team on the AI Field Assistant concept and MLR requirements",
+      "Identify the pilot brand team and secure VP Commercial sponsorship for the POC",
+      "Deliver a 6-week HCP 360 prototype proposal with scope, success metrics, and timeline"
+    ],
+    "whiteboardTalkTrack": [
+      "Draw the current state: IQVIA data warehouse, Salesforce CRM, Veeva Engage, patient support platform — all disconnected",
+      "Show the field rep's problem: calling on Dr. Johnson without knowing her recent prescribing trend or marketing engagement",
+      "Draw the lakehouse: Auto Loader collecting IQVIA and DLT streaming Salesforce events",
+      "Show the HCP 360 Silver layer: one unified record per HCP with prescribing + engagement + patient support + spend",
+      "Show the Gold layer: brand dashboards (day 2!), next-best-action scores, Sunshine Act reports",
+      "Show the AI Field Assistant: 'Hey, what's Dr. Johnson's prescribing trend and what should I talk about today?' — answer grounded in MLR-approved content",
+      "Close with governance: Unity Catalog enforcing IQVIA license restrictions and MLR content boundaries automatically"
+    ],
+    "workshopPlan": [
+      "Morning Session 1 (90 min): Commercial data landscape — map all sources, formats, lag times, and quality issues for CRM, IQVIA, marketing, patient support",
+      "Morning Session 2 (60 min): Commercial use case priority — rank brand analytics, field AI, Sunshine Act automation, and market access by value and urgency",
+      "Afternoon Session 1 (90 min): HCP 360 design — what data elements does each use case require from the HCP 360? Identity resolution approach?",
+      "Afternoon Session 2 (60 min): AI Field Assistant design — MLR requirements, content scope, rep workflow integration",
+      "Wrap-up (30 min): Pilot brand selection, POC scope, and timeline"
+    ],
+    "objections": [
+      {
+        "objection": "Our reps already have IQVIA data in their CRM. Why do we need a separate platform?",
+        "response": "Most CRM integrations show IQVIA data in a CRM report view — they don't enable the analytics, AI modeling, and cross-source correlation that drive real commercial intelligence. The lakehouse enables the next-best-action AI model that considers prescribing behavior, engagement history, and competitive positioning simultaneously — capabilities that no CRM report can provide. The platform complements the CRM; it doesn't replace it."
+      },
+      {
+        "objection": "We're worried about regulatory risk if the AI Field Assistant says something off-label.",
+        "response": "The RAG architecture is specifically designed to prevent this risk. The AI only generates responses grounded in documents loaded into the MLR-approved document catalog. If the MLR team has not approved a piece of content, the AI cannot retrieve or cite it. Every response includes a citation trail that Medical Affairs can audit. This is actually a more controlled environment than unstructured rep conversations, where off-label statements can happen without any audit trail."
+      }
+    ]
+  }
+}

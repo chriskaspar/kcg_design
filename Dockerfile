@@ -1,18 +1,37 @@
-# FROM node:20-slim
+# ── Stage 1: Install all dependencies ────────────────────────────────────────
+FROM node:20-slim AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
 
-# WORKDIR /app
+# ── Stage 2: Build Vite frontend ─────────────────────────────────────────────
+FROM deps AS builder
+COPY . .
+RUN npm run build
 
-# ENV NODE_ENV=production
-# ENV PIPELINE_UI_HOST=0.0.0.0
-# ENV PIPELINE_UI_PORT=8080
+# ── Stage 3: Production runner ────────────────────────────────────────────────
+FROM node:20-slim AS runner
+WORKDIR /app
 
-# COPY package*.json ./
-# RUN npm ci --omit=dev
+ENV NODE_ENV=production
+ENV PORT=8080
 
-# # COPY scripts ./scripts
-# # COPY ui ./ui
-# # COPY data ./data
+# Copy dependencies (includes tsx for running TypeScript server)
+COPY --from=deps /app/node_modules ./node_modules
 
-# EXPOSE 8080
+# Copy built frontend assets
+COPY --from=builder /app/dist ./dist
 
-# CMD ["npm", "run", "ui:start"]
+# Copy server source
+COPY server ./server
+
+# Copy shared source files referenced by the server
+COPY src/lib ./src/lib
+COPY src/types ./src/types
+
+# Copy package.json (needed for ESM "type": "module")
+COPY package.json ./
+
+EXPOSE 8080
+
+CMD ["node_modules/.bin/tsx", "server/index.ts"]

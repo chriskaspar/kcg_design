@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { ARCHITECT_TABS } from "../lib/architectFramework";
-import type { ArchitectAnswers } from "../types/architect";
+import type { ArchitectAnswers, ArchitectTabId } from "../types/architect";
 
 interface DiscoveryPanelProps {
   answers: ArchitectAnswers;
@@ -62,7 +62,7 @@ export function DiscoveryPanel({ answers, onAnswerChange }: DiscoveryPanelProps)
   const handleTabSelect = (tabId: string) => {
     const tab = ARCHITECT_TABS.find((t) => t.id === tabId);
     if (!tab) return;
-    setSelectedTabId(tabId);
+    setSelectedTabId(tab.id as ArchitectTabId);
     const firstQ = tab.questions[0];
     if (firstQ) {
       setSelectedCategory(firstQ.meaning);
@@ -71,7 +71,7 @@ export function DiscoveryPanel({ answers, onAnswerChange }: DiscoveryPanelProps)
   };
 
   const handleCategorySelect = (tabId: string, category: string) => {
-    setSelectedTabId(tabId);
+    setSelectedTabId(tabId as ArchitectTabId);
     setSelectedCategory(category);
     const tab = ARCHITECT_TABS.find((t) => t.id === tabId);
     const firstQ = tab?.questions.find((q) => q.meaning === category);

@@ -1,0 +1,499 @@
+{
+  "id": "multi-tenant-static",
+  "title": "Multi-Tenant SaaS Data Platform",
+  "updatedAt": "2026-03-14T00:00:00.000Z",
+  "input": {
+    "scenarioTitle": "Multi-Tenant SaaS Data Platform",
+    "industry": "Technology",
+    "customerType": "SaaS",
+    "problemStatement": "A fast-growing SaaS company needs to build a governed multi-tenant analytics platform that enforces strict tenant data isolation, provides a shared medallion architecture for cost efficiency, and delivers AI-powered analytics products to thousands of tenants without revealing cross-tenant data.",
+    "businessGoals": "Build a scalable multi-tenant data platform that delivers self-service analytics and AI insights to tenants, maintains strong tenant isolation for compliance and trust, enables cross-tenant benchmarking on anonymized data, and supports the company's analytics-as-a-feature revenue strategy.",
+    "constraints": "Tenant data isolation is a contractual and legal obligation — no cross-tenant data leakage is acceptable. The platform must scale to 5,000+ tenants without proportional cost increases. SOC 2 Type II compliance required. GDPR data residency requirements for EU tenants.",
+    "timeline": "12 months to production for first 100 tenants, 18 months for full scale",
+    "currentState": "Each tenant has a separate PostgreSQL database instance with custom ETL jobs piping data into a shared Redshift cluster with schema-per-tenant isolation. This architecture does not scale — each new tenant requires manual database provisioning, and the Redshift cluster is at capacity.",
+    "desiredFutureState": "A unified Databricks Lakehouse with automated tenant onboarding, Unity Catalog row-level security for tenant isolation, a shared medallion architecture for cost efficiency, and AI-powered insights delivered through a tenant-facing analytics portal.",
+    "stakeholders": "CTO, VP of Engineering, Head of Data Platform, Chief Security Officer, VP of Customer Success",
+    "compliance": ["SOC 2 Type II", "GDPR", "CCPA", "ISO 27001"],
+    "architecturePreference": "Medallion (Bronze/Silver/Gold) on Databricks Lakehouse with Unity Catalog isolation",
+    "outputDepth": "Comprehensive"
+  },
+  "architecture": {
+    "title": "Multi-Tenant SaaS Data Platform Architecture",
+    "summary": "A scalable Databricks Lakehouse with Unity Catalog row-level security providing tenant isolation across a shared medallion architecture, delivering AI-powered analytics products to thousands of tenants through an analytics portal.",
+    "solutionOverview": "Tenant data from operational databases, event streams, and APIs flows into the Databricks Lakehouse via Auto Loader and Delta Live Tables. Each tenant's data is tagged with a tenant_id at ingestion and isolated using Unity Catalog row-level security policies throughout the Bronze, Silver, and Gold layers. The platform uses a shared-compute, isolated-data model: all tenants share the same Databricks compute infrastructure and pipeline code, but Unity Catalog ensures each tenant can only access their own data. The Gold layer materializes per-tenant analytics products — usage metrics, AI-generated insights, and industry benchmark comparisons using anonymized cross-tenant aggregates. A tenant-facing analytics portal queries Gold data through Databricks SQL Warehouses with tenant-context authentication.",
+    "assumptions": [
+      "Tenant data is tagged with a unique tenant_id in all source systems",
+      "OAuth 2.0 or OIDC is available for tenant-authenticated access to the analytics portal",
+      "EU tenants can have their data stored in an EU cloud region (GDPR compliance)",
+      "The SaaS product's operational databases can stream events via Kafka or webhook",
+      "Benchmarking use cases are limited to anonymized, aggregated cross-tenant data with k-anonymity thresholds"
+    ],
+    "details": [
+      {
+        "title": "Tenant Data Sources",
+        "body": "Three primary source types: Tenant operational databases (PostgreSQL, MySQL) per-tenant database instances containing product usage data; API-generated events from the SaaS application (user actions, feature usage, subscription changes) via Kafka event streams; and operational data feeds (billing, support tickets, configuration) via API integrations."
+      },
+      {
+        "title": "Ingestion and Tenant Isolation",
+        "body": "Auto Loader ingests bulk data with tenant_id partitioning, tagging every record with the originating tenant at ingestion. Delta Live Tables processes Kafka event streams with tenant-aware routing. All ingestion pipelines are shared code with tenant_id as a first-class citizen in every schema."
+      },
+      {
+        "title": "Tenant Isolation via Unity Catalog",
+        "body": "Unity Catalog row-level security policies enforce tenant isolation at the data layer: every table in Bronze, Silver, and Gold has a row-level security policy that restricts reads to records matching the authenticated tenant context. This isolation is enforced at the engine level — no application-layer filtering is required."
+      },
+      {
+        "title": "AI Insights Engine",
+        "body": "The AI Insights Engine provides tenant-personalized AI analytics: usage trend explanations, predictive churn signals, anomaly detection on tenant metrics, and natural language querying of the tenant's data through a Genie-style interface. Cross-tenant benchmarking uses anonymized aggregates that pass k-anonymity thresholds before being presented to any tenant."
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-apis",
+        "label": "Tenant APIs",
+        "iconId": "source-api-systems",
+        "vendor": "generic",
+        "notes": "SaaS application APIs generating tenant-scoped event data — user actions, feature usage, configuration changes, and product interactions",
+        "x": 60,
+        "y": 100,
+        "metadata": { "group": "Tenant Data Sources" }
+      },
+      {
+        "id": "n-db",
+        "label": "Operational Databases",
+        "iconId": "source-operational-db",
+        "vendor": "generic",
+        "notes": "Per-tenant PostgreSQL/MySQL operational database instances containing transactional product data and configuration state",
+        "x": 60,
+        "y": 260,
+        "metadata": { "group": "Tenant Data Sources" }
+      },
+      {
+        "id": "n-events",
+        "label": "Event Streams",
+        "iconId": "source-event-streams",
+        "vendor": "generic",
+        "notes": "Kafka event streams from the SaaS platform capturing user sessions, feature activations, and subscription lifecycle events in real time",
+        "x": 60,
+        "y": 420,
+        "metadata": { "group": "Tenant Data Sources" }
+      },
+      {
+        "id": "n-autoloader",
+        "label": "Auto Loader",
+        "iconId": "databricks-data-ingestion",
+        "vendor": "databricks",
+        "notes": "Tenant-partitioned batch ingestion for operational database exports with tenant_id tagging and schema evolution for multi-version tenant schemas",
+        "x": 290,
+        "y": 180,
+        "metadata": { "group": "Ingestion & Isolation" }
+      },
+      {
+        "id": "n-dlt",
+        "label": "Delta Live Tables",
+        "iconId": "databricks-dlt",
+        "vendor": "databricks",
+        "notes": "Shared DLT pipelines with tenant-aware routing for Kafka event streams, enforcing tenant_id consistency and data quality expectations",
+        "x": 290,
+        "y": 380,
+        "metadata": { "group": "Ingestion & Isolation" }
+      },
+      {
+        "id": "n-bronze",
+        "label": "Bronze Layer (Tenant Isolated)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Raw tenant data partitioned by tenant_id in Delta format with row-level security policies applied. Unity Catalog enforces tenant isolation at engine level.",
+        "x": 540,
+        "y": 280,
+        "metadata": { "group": "Bronze Layer" }
+      },
+      {
+        "id": "n-silver",
+        "label": "Silver Layer (Normalized Tenant Data)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Normalized tenant entities — users, accounts, events, subscriptions — in canonical schemas with tenant_id row-level security and GDPR-compliant PII handling",
+        "x": 740,
+        "y": 280,
+        "metadata": { "group": "Silver Layer" }
+      },
+      {
+        "id": "n-gold",
+        "label": "Gold Layer (Tenant Data Products)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Per-tenant analytics products: usage metrics, feature adoption, churn risk scores, anomalies. Cross-tenant benchmarks using k-anonymous aggregates.",
+        "x": 940,
+        "y": 280,
+        "metadata": { "group": "Gold Layer" }
+      },
+      {
+        "id": "n-uc",
+        "label": "Unity Catalog (Row-Level Security)",
+        "iconId": "databricks-governance",
+        "vendor": "databricks",
+        "notes": "Row-level security policies on every table enforce tenant isolation. Tenant service accounts have READ access scoped to their tenant_id only. SOC 2 audit logs.",
+        "x": 740,
+        "y": 530,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-sql",
+        "label": "SQL Warehouses",
+        "iconId": "databricks-sql-warehouses",
+        "vendor": "databricks",
+        "notes": "Shared SQL Warehouses with per-tenant query routing. Serverless auto-scaling handles peak analytics load without dedicated per-tenant compute.",
+        "x": 1140,
+        "y": 160,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-portal",
+        "label": "Tenant Analytics Portal",
+        "iconId": "generic-web-app",
+        "vendor": "generic",
+        "notes": "Tenant-facing analytics portal with OAuth 2.0 tenant authentication, self-service dashboards, and embedded AI insights powered by the Gold layer",
+        "x": 1300,
+        "y": 200,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-ai",
+        "label": "AI Insights Engine",
+        "iconId": "databricks-genie",
+        "vendor": "databricks",
+        "notes": "Tenant-personalized AI: natural language querying of tenant data via Genie, churn prediction, usage anomaly detection, and benchmarking against anonymized peer tenants",
+        "x": 1230,
+        "y": 400,
+        "metadata": { "group": "Analytics & AI" }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n-apis", "target": "n-autoloader", "label": "API event exports", "protocol": "REST" },
+      { "id": "e2", "source": "n-db", "target": "n-autoloader", "label": "CDC / batch DB exports", "protocol": "JDBC/Delta" },
+      { "id": "e3", "source": "n-events", "target": "n-dlt", "label": "Kafka event stream", "protocol": "Kafka" },
+      { "id": "e4", "source": "n-autoloader", "target": "n-bronze", "label": "Tenant-partitioned Delta write", "protocol": "Delta" },
+      { "id": "e5", "source": "n-dlt", "target": "n-bronze", "label": "Streaming Delta write", "protocol": "Delta" },
+      { "id": "e6", "source": "n-bronze", "target": "n-silver", "label": "Normalize and canonicalize", "protocol": "Spark" },
+      { "id": "e7", "source": "n-silver", "target": "n-gold", "label": "Aggregate and enrich", "protocol": "Spark" },
+      { "id": "e8", "source": "n-silver", "target": "n-uc", "label": "Register with RLS policies", "protocol": "Unity Catalog" },
+      { "id": "e9", "source": "n-gold", "target": "n-uc", "label": "Register products", "protocol": "Unity Catalog" },
+      { "id": "e10", "source": "n-gold", "target": "n-sql", "label": "SQL query with tenant context", "protocol": "SQL" },
+      { "id": "e11", "source": "n-sql", "target": "n-portal", "label": "Tenant dashboard data", "protocol": "REST/SQL" },
+      { "id": "e12", "source": "n-gold", "target": "n-ai", "label": "Tenant data context", "protocol": "REST" },
+      { "id": "e13", "source": "n-ai", "target": "n-portal", "label": "AI insights delivery", "protocol": "REST" },
+      { "id": "e14", "source": "n-uc", "target": "n-ai", "label": "Tenant-scoped data access", "protocol": "Unity Catalog" }
+    ],
+    "refinements": [
+      "Add a tenant self-service onboarding API that automatically provisions Unity Catalog schemas and row-level security policies for new tenants",
+      "Implement a natural language analytics interface using Databricks Genie so tenants can query their data in plain English",
+      "Add cross-tenant industry benchmarking with differential privacy guarantees to prevent statistical inference attacks",
+      "Build a GDPR data deletion automation that propagates right-to-be-forgotten requests through all medallion layers",
+      "Implement tenant-level cost attribution tracking to support analytics-as-a-service pricing based on compute and storage consumption"
+    ]
+  },
+  "architectAnswers": {
+    "why_w1": "The current schema-per-tenant Redshift architecture has hit its scaling limit at 500 tenants. Adding new tenants requires manual database provisioning, ETL job creation, and Redshift schema setup — a 3-day process per tenant. With 50+ new enterprise tenants per month, the operations team cannot keep up. The Databricks Lakehouse automates tenant onboarding in under 1 hour through a self-service API.",
+    "why_w2": "Tenant data isolation is the SaaS company's most critical trust signal. Any breach of isolation — even accidental — risks terminating enterprise contracts worth millions of dollars annually. The current application-layer filtering approach requires every query to include a WHERE tenant_id = ? clause, which is vulnerable to developer errors. Unity Catalog row-level security enforces isolation at the engine level, making it impossible for application-layer bugs to expose cross-tenant data.",
+    "why_w3": "The product roadmap includes analytics-as-a-feature as a revenue line — charging enterprise customers for advanced analytics and AI insights embedded in the product. This requires a production-grade analytics backend with performance SLAs, not a shared reporting database. The Gold layer data products with SQL Warehouses provide the performance and reliability needed to deliver this feature commercially.",
+    "why_h1": "GDPR requires the ability to delete all of a data subject's personal data within 30 days of a deletion request. In the current architecture, personal data is scattered across dozens of PostgreSQL instances and a Redshift cluster — a deletion request requires manual work in each system, taking days and introducing error risk. The Databricks Lakehouse with Delta Lake deletion vectors enables compliant right-to-be-forgotten automation across all layers.",
+    "why_h2": "Tenant churn is a critical business problem: the company loses approximately $3M in ARR per quarter to churn. Product analytics shows that tenants who actively use analytics features have 40% lower churn rates. Investing in a production analytics platform directly supports retention, making the platform investment self-funding through reduced churn.",
+    "why_h3": "Enterprise tenants increasingly request SOC 2 Type II compliance reports for the analytics infrastructure as part of their vendor due diligence. The current architecture lacks the audit logging, access controls, and change management controls required for SOC 2. Unity Catalog provides the technical controls needed to achieve and maintain SOC 2 Type II certification for the data platform.",
+    "goal_g1": "The primary goal is a production-grade multi-tenant analytics platform supporting 5,000+ tenants with automated onboarding (under 1 hour from contract signature to first data available), Unity Catalog row-level security enforcement, and Gold layer data products refreshed every 4 hours for all tenants simultaneously.",
+    "goal_g2": "The AI Insights Engine must deliver personalized, tenant-specific insights — not generic reports — including predictive churn risk with explanatory factors, usage anomaly detection with root cause analysis, and natural language querying of the tenant's own data. These insights must be computationally feasible across 5,000 tenants without per-tenant compute allocation.",
+    "goal_o1": "Operational engineering success: the data platform team of 8 engineers can manage the platform for 5,000 tenants without proportional headcount increases. Automated tenant onboarding, self-healing DLT pipelines, and Unity Catalog self-service eliminate the per-tenant manual operations that currently limit scale.",
+    "goal_o2": "Tenant-facing performance SLAs: analytics portal queries must complete within 5 seconds for standard dashboard requests, and AI insights must be pre-computed in the Gold layer rather than computed on demand. SQL Warehouses with photon acceleration and Delta Lake result caching deliver these SLAs without per-tenant compute isolation.",
+    "goal_a1": "The platform must support 5,000 concurrent tenant sessions during peak hours (9 AM-11 AM in each timezone) without performance degradation. SQL Warehouse auto-scaling and connection pooling ensure that peak load is handled elastically without over-provisioning for off-peak hours.",
+    "goal_a2": "Tenant onboarding automation must be fully API-driven: a single POST /api/v1/tenants/{tenant_id}/provision call must create the Unity Catalog schema, apply row-level security policies, create the tenant service account, configure auto Loader for the tenant's data sources, and trigger the initial data load — all within 30 minutes.",
+    "goal_l1": "Row-level security is the core isolation mechanism: every table in Bronze, Silver, and Gold has a Unity Catalog row filter that restricts reads to WHERE tenant_id = current_setting('app.tenant_id'). The tenant session context is set at login time from the OAuth token's tenant claim and cannot be overridden by application code.",
+    "goal_l2": "Cross-tenant analytics for benchmarking are governed by k-anonymity thresholds: no benchmark value is presented to a tenant if it is derived from fewer than 50 tenants, preventing statistical inference of individual tenant behavior. Differential privacy noise is added to continuous benchmarks with a configurable epsilon parameter.",
+    "safe_s1": "SOC 2 Type II controls: Unity Catalog audit logs capture all data access with user identity, query text, data accessed, and timestamp. Cluster policies enforce approved runtimes and no-internet access. All Databricks access uses SSO via SAML/OIDC with MFA required. Service account credentials are managed in the company's secrets management system with automatic rotation.",
+    "safe_s2": "GDPR right-to-be-forgotten automation: a tenant deletion request triggers a Databricks Workflow that uses Delta Lake deletion vectors to remove PII from all Bronze, Silver, and Gold tables without a full table rewrite. The deletion is logged in Unity Catalog audit history. Completion confirmation is sent to the tenant within 72 hours.",
+    "safe_a1": "EU tenant GDPR data residency: EU tenants are assigned to a Databricks workspace in an EU cloud region (e.g., AWS eu-west-1 or Azure West Europe). Unity Catalog metadata is replicated for governance visibility but data remains in the EU region. An EU tenant's data never leaves the EU region for any analytics or AI processing.",
+    "safe_a2": "The AI Insights Engine uses Databricks AI Gateway to mediate all LLM calls. Tenant data sent to LLM APIs is governed by the AI Gateway — PHI and PII fields are masked before being sent to external model APIs. AI responses are logged for audit purposes. Tenants can opt out of LLM-powered features for data sovereignty reasons.",
+    "safe_f1": "DLT data quality expectations enforce tenant data integrity: every ingested event must have a valid tenant_id that matches the active tenant registry, non-null required fields, and timestamp values within an acceptable skew window. Events failing validation are quarantined in a dead-letter table with the failure reason for remediation.",
+    "safe_e1": "The platform has an RPO of 1 hour and RTO of 2 hours. Delta Lake transaction logs are replicated cross-region. For EU tenants, cross-region replication remains within the EU to comply with GDPR data transfer restrictions. Automated failover testing is performed quarterly as part of SOC 2 operational controls.",
+    "safe_e2": "Tenant-level pipeline failures are isolated — a DLT pipeline failure for Tenant A does not affect Tenant B. Alerting routes to the platform operations team with tenant severity classification (enterprise tenants trigger PagerDuty; standard tenants trigger Slack). All tenant SLA breaches are logged for SOC 2 incident management.",
+    "flow_f1": "Data flows: Tenant operational systems → Auto Loader/DLT (with tenant_id tagging) → Bronze (tenant-isolated) → Silver (normalized tenant entities) → Gold (per-tenant analytics products) → SQL Warehouses → Analytics Portal and AI Insights Engine. Cross-tenant benchmarks flow: Gold anonymized aggregates → k-anonymity validation → benchmark tables → all tenants via SQL Warehouses.",
+    "flow_l1": "Event streaming is the highest-throughput flow: at 5,000 tenants with an average of 1,000 events/second/tenant, the Kafka-to-DLT stream must process 5 million events per second at peak. DLT auto-scaling handles this with Dynamic Allocation, scaling from 50 to 500 workers during peak hours. Events are available in the Bronze layer within 30 seconds of Kafka publication.",
+    "flow_o1": "Tenant onboarding data quality: new tenants go through a data profiling step at initial load that reports on schema completeness, value distributions, and anomaly flags. This profiling report is surfaced to the tenant in the analytics portal, helping them understand data quality issues before analytics are enabled for their organization.",
+    "flow_w1": "Databricks Workflows orchestrates hourly Gold layer refresh pipelines that process all tenants in parallel using a fan-out pattern — a parent job distributes tenant IDs across child jobs that run concurrently, completing the full 5,000-tenant refresh in under 60 minutes. Tenants with higher analytics tiers receive priority scheduling.",
+    "data_d1": "Core data domains follow a canonical SaaS product model: Tenants (organization profile, plan tier, contract dates, billing information); Users (tenant members with roles, activity timestamps, feature permissions); Events (user and system events with action, entity, timestamp, properties); Resources (product entities created by users — records, projects, campaigns, etc.); and Subscriptions (plan changes, usage limits, billing events).",
+    "data_d2": "Behavioral analytics domains derived in Silver: Session analytics (session duration, page views, feature interactions by user and day); Feature adoption (feature usage rates by tenant, new feature adoption velocity, feature retention); Engagement health scores (daily/weekly/monthly active user ratios, feature breadth usage); and Product-led growth signals (upgrade-triggering behaviors, viral expansion indicators).",
+    "data_a1": "Tenant schema heterogeneity is a major data quality challenge: enterprise customers often customize the SaaS product schema — adding custom fields, renaming entities, enabling optional modules — creating schema variation that the Silver canonicalization layer must handle. Auto Loader's schema evolution with automatic new column handling is critical for managing this variation.",
+    "data_a2": "Event volume imbalance across tenants: the top 10 enterprise tenants each generate 1 million+ events per day, while the median SMB tenant generates fewer than 1,000 events per day. This imbalance means per-tenant processing must be dynamically sized — large tenants need significantly more compute than small tenants for the same pipeline run.",
+    "data_t1": "The Silver canonical schema is designed to be product-version-agnostic: each entity (User, Event, Resource) has a stable identifier, a set of core required fields, and an extensible properties map for tenant-specific customization. This schema design supports schema evolution without breaking downstream Gold analytics as new product features are released.",
+    "data_t2": "Gold layer data products use a pre-aggregated metric store pattern: rather than computing analytics on demand from Silver event data (which would be too slow at 5,000 tenants), the Gold layer pre-computes daily, weekly, and monthly metric aggregates for every tenant during the hourly refresh cycle. Dashboard queries hit pre-aggregated Gold tables rather than raw Silver events.",
+    "data_a3": "GDPR data retention: personal data (user names, email addresses, IP addresses) may only be retained for as long as the data processing basis remains valid. When a tenant cancels their subscription, their user PII must be deleted within 30 days. The platform maintains a data retention policy table per tenant in Unity Catalog that drives automated deletion workflows.",
+    "data_a4": "Multi-region lineage tracking: for EU tenants, Unity Catalog lineage metadata (which tables derived which outputs) is maintained in the EU region alongside the data. This enables data subject access request fulfillment — identifying exactly which Gold layer outputs contain a specific user's data — without transferring personal data out of the EU.",
+    "fast_f1": "The fastest path to value is a usage dashboard for the top 50 enterprise tenants showing daily active users, feature adoption, and engagement trends. These tenants are the highest-revenue customers with the most to gain from analytics insights. Deploying this dashboard in 6-8 weeks demonstrates the platform to the most important customers and reduces churn risk.",
+    "fast_f2": "An automated churn prediction model using 3 months of event data from current and churned tenants can be deployed in 8 weeks. Even a baseline model using simple engagement signals (DAU/MAU ratio, feature breadth decline) as predictors provides immediate value to the Customer Success team, reducing the manual effort of identifying at-risk accounts.",
+    "fast_a1": "The 12-week rapid deployment plan: Weeks 1-3 cover infrastructure, Unity Catalog tenant schema, and Auto Loader for the first 50 pilot tenants. Weeks 4-6 deliver Bronze ingestion and Silver normalization for all pilot tenants. Weeks 7-9 deliver Gold usage metrics and the analytics portal MVP for pilot tenant review. Weeks 10-12 add churn prediction and scale to 500 tenants.",
+    "fast_a2": "Automate the tenant onboarding workflow from day one — even if only 50 tenants are in the pilot. Building the automation infrastructure during the pilot means that scaling to 5,000 tenants requires only compute capacity, not additional engineering work. Manual tenant onboarding is a trap that prevents scale.",
+    "fast_s1": "Quick wins in 90 days: (1) Usage dashboard for top 50 enterprise tenants replacing manual Excel reports from the Customer Success team; (2) Daily churn risk score for all tenants surfaced to CSM tool integration; (3) Automated tenant onboarding reducing 3-day manual process to under 1 hour; (4) SOC 2 audit log collection via Unity Catalog replacing current manual log aggregation.",
+    "fast_t1": "Databricks Terraform provider automates workspace, Unity Catalog catalog, and schema provisioning. A tenant onboarding Terraform module can create the full Unity Catalog isolation structure for a new tenant in under 2 minutes. This module becomes the foundation for the self-service onboarding API.",
+    "fast_t2": "Databricks Genie (AI-powered natural language querying) can be deployed on top of Gold layer data within 2 weeks of Gold layer availability, giving enterprise tenants natural language access to their analytics data with zero additional development effort. This is a high-visibility feature that differentiates the analytics portal immediately.",
+    "run_r1": "The platform team of 8 engineers manages all 5,000 tenants: 3 data engineers own pipeline development and maintenance; 2 ML engineers own the churn and insights models; 2 platform engineers own infrastructure and tenant onboarding automation; 1 data governance lead owns Unity Catalog policies and SOC 2 controls. The self-service automation model keeps this ratio flat as tenants scale.",
+    "run_r2": "Cost optimization at scale is critical for the platform's unit economics. Serverless SQL Warehouses eliminate idle compute costs for the analytics portal. DLT Enhanced Autoscaling right-sizes compute per tenant batch. Delta Lake Z-ordering on tenant_id and timestamp optimizes query performance, reducing compute cost per query. Target cost per tenant per month: under $10 for SMB, under $100 for enterprise with heavy analytics usage.",
+    "run_u1": "Schema migrations across 5,000 tenants are automated using Databricks Workflows: a migration job runs ALTER TABLE statements in parallel across all tenant schemas in the Unity Catalog, with automatic rollback on failure. Schema migrations are versioned and idempotent, supporting safe rerun after partial failures.",
+    "run_u2": "The churn prediction model is retrained weekly using the prior 90 days of event data from all tenants (using anonymized cross-tenant data). Model performance is monitored weekly with automatic alerting if AUC drops below 0.75. New feature signals are added to the model through the MLflow feature store with A/B testing before full deployment.",
+    "run_n1": "The platform runs in a multi-region deployment: US tenants in us-east-1, EU tenants in eu-west-1, and APAC tenants in ap-southeast-1. Each region has an independent Databricks workspace with separate Unity Catalog metadata. A global control plane tracks tenant region assignments and routing. No cross-region data transfer occurs for any tenant's personal data.",
+    "win_w1": "Platform success metrics: (1) Tenant onboarding automated to under 1 hour for 95% of new tenants; (2) Analytics portal achieving 60%+ weekly active usage among enterprise tenants; (3) Churn model correctly identifying 70%+ of churned tenants 30 days before churn; (4) Zero cross-tenant data isolation incidents; (5) SOC 2 Type II certification achieved.",
+    "win_i1": "Business impact: Analytics-as-a-feature generates $5M in new ARR in Year 1 (enterprise analytics tier at $15K/year across 333 tenants); churn model reduces quarterly ARR loss by 20% ($600K/quarter saved); automated onboarding reduces CS ops cost by $800K annually; SOC 2 certification unlocks $10M+ in enterprise contracts that required it.",
+    "win_n1": "The multi-tenant analytics platform becomes the company's most differentiated product capability. Over 3 years, the AI insights engine evolves from descriptive analytics to prescriptive recommendations — telling each tenant not just what happened, but what to do next. The cross-tenant benchmarking capability, powered by 5,000 tenants' anonymized behavioral data, becomes a proprietary data asset that no competitor can replicate without similar scale."
+  },
+  "story": {
+    "strategy": "The SaaS company chose Unity Catalog row-level security as the architectural foundation for tenant isolation rather than physical database separation, recognizing that the cost and operational overhead of per-tenant databases does not scale beyond 500 tenants. By enforcing isolation at the engine level with a single tenant_id predicate on every table, the platform achieves cryptographic-equivalent isolation guarantees without the operational complexity of schema-per-tenant.",
+    "technology": "The platform uses Databricks Lakehouse with serverless SQL Warehouses for elastic analytics serving, Delta Live Tables for continuous event stream processing from Kafka, and Unity Catalog for tenant isolation governance. Tenant onboarding is fully automated through a Terraform-based provisioning pipeline that creates the complete Unity Catalog structure in under 30 minutes. Databricks Genie provides natural language analytics for enterprise tenants without additional development.",
+    "outcome": "Within 12 months, the platform onboarded 2,000 tenants with fully automated provisioning. Analytics portal weekly active usage reached 65% among enterprise tenants. The churn prediction model identified 340 at-risk tenants in its first quarter, of which 189 accepted Customer Success intervention — retaining $2.8M in ARR that would have churned. Zero cross-tenant data isolation incidents occurred in the first 18 months.",
+    "returnValue": "The analytics platform generated $6.5M in new ARR from the enterprise analytics tier in its first year. Churn reduction from the prediction model saved $2.4M in ARR annually. Automated onboarding reduced operational costs by $900K. SOC 2 Type II certification, enabled by Unity Catalog audit logging, unlocked $12M in new enterprise contracts with data security requirements. Total first-year value: $21.8M against a $2.1M platform investment.",
+    "years": "Over 5 years, the 5,000-tenant behavioral dataset becomes the company's most valuable asset. AI models trained on anonymized cross-tenant patterns can predict product success for new tenants, recommend optimal feature adoption sequences, and identify the product interventions that maximize revenue expansion within accounts. The platform evolves from a reporting tool to a product intelligence layer that powers the company's entire go-to-market strategy."
+  },
+  "playbook": {
+    "scenarioTitle": "Multi-Tenant SaaS Data Platform",
+    "scenarioSummary": "A fast-growing SaaS company needs a governed multi-tenant analytics platform built on Databricks that scales to 5,000+ tenants while enforcing strict data isolation, delivering AI-powered insights to tenants, and supporting SOC 2 Type II and GDPR compliance — all with a team of 8 data engineers.",
+    "businessDrivers": [
+      "Current schema-per-tenant Redshift architecture cannot scale beyond 500 tenants without proportional cost and headcount",
+      "Analytics-as-a-feature is a planned revenue line that requires production-grade analytics infrastructure",
+      "Tenant churn costs $3M per quarter — AI-powered churn prediction requires a unified behavioral data platform",
+      "Enterprise sales require SOC 2 Type II certification of the analytics infrastructure",
+      "GDPR right-to-be-forgotten obligations are impossible to fulfill efficiently across the current fragmented data infrastructure"
+    ],
+    "constraints": [
+      "Tenant data isolation is a contractual obligation — any cross-tenant data exposure terminates enterprise contracts",
+      "The platform must scale to 5,000 tenants with the current team of 8 engineers",
+      "EU tenants have GDPR data residency requirements restricting data to EU cloud regions"
+    ],
+    "recommendedEngagementApproach": [
+      "Begin with a Unity Catalog tenant isolation architecture review — demonstrate RLS enforcement with a live proof of concept",
+      "Quantify the tenant onboarding automation opportunity: current time × new tenant volume = operational leverage gained",
+      "Pilot with 50 of the company's top enterprise tenants to validate the platform before full rollout",
+      "Deliver analytics portal MVP to pilot tenants for feedback before general availability"
+    ],
+    "confidenceRating": 87,
+    "recommendedConversationPath": [
+      "Scale pain: How many tenants today, how many projected in 18 months, what's the current onboarding time?",
+      "Isolation requirements: What contractual or regulatory data isolation requirements do you have?",
+      "Analytics revenue: What is the analytics-as-a-feature roadmap and pricing model?",
+      "Churn: What is the current churn rate and cost, and does the team have a prediction program?",
+      "Compliance: What SOC 2 and GDPR obligations apply to the analytics infrastructure?"
+    ],
+    "discoveryQuestions": [
+      {
+        "category": "Scale and Operations",
+        "question": "How long does it currently take to onboard a new tenant to your analytics infrastructure, and what manual steps are involved?",
+        "whyItMatters": "The current onboarding time quantifies the operational leverage of automation. At 50+ tenants per month, even a 3-hour reduction in onboarding time saves significant engineering capacity.",
+        "goodSignal": "3+ days of manual work per tenant involving multiple teams — a high-value automation target.",
+        "redFlag": "Already automated to under 1 hour — the primary pain point is not onboarding but data isolation or analytics quality."
+      },
+      {
+        "category": "Tenant Isolation",
+        "question": "How is tenant data isolation currently enforced, and have you had any incidents or audit findings related to data isolation?",
+        "whyItMatters": "Application-layer isolation is vulnerable to developer errors. Engine-level isolation via Unity Catalog RLS eliminates this risk. Any past incidents create urgency.",
+        "goodSignal": "Application-layer WHERE clause filtering with no engine-level enforcement and at least one near-miss or audit finding.",
+        "redFlag": "Physical database separation per tenant at high cost — they know the isolation problem is solved but the scaling problem is acute."
+      },
+      {
+        "category": "Analytics Revenue",
+        "question": "What is the product roadmap for analytics-as-a-feature, and do you have enterprise customers asking for advanced analytics capabilities today?",
+        "whyItMatters": "A concrete analytics revenue roadmap with enterprise customer demand creates urgency and budget justification for platform investment.",
+        "goodSignal": "Analytics tier is on the 12-month product roadmap with 20+ enterprise customers on a waitlist.",
+        "redFlag": "Analytics is an internal operations tool with no plans to expose it to customers — the use case is internal, not revenue-generating."
+      },
+      {
+        "category": "GDPR and Compliance",
+        "question": "What percentage of your tenants are EU-based, and do you have GDPR data processing agreements in place with them?",
+        "whyItMatters": "EU tenant percentage determines whether multi-region deployment is required and how complex the GDPR data residency architecture must be.",
+        "goodSignal": "30%+ EU tenants with existing DPAs — clear multi-region requirement with legal foundation already in place.",
+        "redFlag": "100% US tenants with no EU expansion plans — simplifies architecture significantly, GDPR not a near-term concern."
+      },
+      {
+        "category": "Data Volume",
+        "question": "What is the average event volume per tenant per day, and how does this vary between your SMB and enterprise customers?",
+        "whyItMatters": "Event volume imbalance determines compute strategy: high-volume enterprise tenants need dynamic allocation while low-volume SMB tenants can share fixed compute.",
+        "goodSignal": "10:1 or greater volume ratio between enterprise and SMB tenants — needs dynamic per-tenant compute allocation in DLT pipelines.",
+        "redFlag": "Very uniform event volumes — simplifies architecture but may indicate the product lacks deep engagement features that generate rich analytics data."
+      }
+    ],
+    "problemFraming": {
+      "statement": "A fast-growing SaaS company cannot scale its analytics infrastructure beyond 500 tenants, cannot reliably enforce data isolation at the engine level, and cannot deliver the AI-powered analytics features that enterprise customers require — limiting revenue growth, increasing churn, and creating compliance risk.",
+      "desiredOutcomes": [
+        "Tenant onboarding automated to under 1 hour for all new tenants",
+        "Engine-level tenant isolation enforced by Unity Catalog with zero cross-tenant data access possible",
+        "Analytics-as-a-feature generating $5M+ in new ARR in Year 1",
+        "Churn prediction model reducing quarterly ARR loss by 20%",
+        "SOC 2 Type II certification of the analytics infrastructure"
+      ],
+      "assumptions": [
+        "Unity Catalog row-level security provides sufficient isolation guarantees for contractual and regulatory requirements",
+        "Serverless SQL Warehouses can deliver analytics portal response times under 5 seconds at peak concurrent tenant usage",
+        "EU tenants are satisfied with data stored in EU cloud regions (no sovereign cloud requirements)",
+        "The engineering team can adopt Terraform-based infrastructure-as-code for tenant provisioning automation"
+      ],
+      "nonNegotiables": [
+        "Zero cross-tenant data access — enforced at the engine level, not the application layer",
+        "Automated tenant onboarding with no manual engineering steps",
+        "GDPR right-to-be-forgotten automation within 30-day SLA"
+      ],
+      "unknowns": [
+        "Whether specific enterprise tenants have contractual requirements for physical data separation rather than logical isolation",
+        "Performance characteristics of Unity Catalog RLS at 5,000 concurrent tenant sessions",
+        "EU sovereign cloud requirements for government-sector tenants"
+      ],
+      "framingStatement": "By building a Unity Catalog-governed multi-tenant Databricks Lakehouse with automated tenant provisioning, we can scale the analytics platform to 5,000 tenants with the current team of 8 engineers, deliver analytics-as-a-feature revenue, and enforce tenant isolation at the engine level — creating a platform that grows the business while managing risk."
+    },
+    "architectureOptions": [
+      {
+        "name": "Shared Compute, Isolated Data (Unity Catalog RLS)",
+        "summary": "A single Databricks workspace with shared compute infrastructure and Unity Catalog row-level security enforcing tenant isolation at the engine level across all medallion layers — the recommended approach for 5,000+ tenant scale.",
+        "whenToUse": [
+          "5,000+ tenants where per-tenant compute is cost-prohibitive",
+          "Contractual data isolation requirements that can be satisfied with engine-level logical isolation",
+          "SOC 2 and GDPR compliance requirements for audit logging and data residency",
+          "Analytics-as-a-feature requiring production-grade performance SLAs"
+        ],
+        "benefits": [
+          "Shared compute dramatically reduces cost — one cluster serves all tenants simultaneously",
+          "Unity Catalog RLS is enforced at the engine, making application-layer bypass impossible",
+          "Automated tenant provisioning through Terraform enables one-hour onboarding at any scale",
+          "Cross-tenant benchmarking on anonymized aggregates creates a proprietary data network effect"
+        ],
+        "tradeoffs": [
+          "Tenants with contractual requirements for physical data separation cannot use this model",
+          "Noisy neighbor effects possible at extreme concurrency — SQL Warehouse query prioritization required",
+          "RLS policy management at 5,000 tenants requires disciplined automation to avoid configuration drift"
+        ],
+        "idealMaturityLevel": "Intermediate",
+        "platformMapping": [
+          "Auto Loader → tenant-partitioned batch ingestion from operational databases",
+          "Delta Live Tables → Kafka event stream with tenant routing",
+          "Unity Catalog RLS → tenant isolation on all Bronze/Silver/Gold tables",
+          "Serverless SQL Warehouses → elastic analytics serving for portal",
+          "Databricks Genie → natural language analytics for enterprise tenants"
+        ],
+        "components": [
+          { "layer": "Ingestion", "items": ["Auto Loader (tenant DB exports)", "DLT (Kafka event streams)", "Tenant onboarding API (Terraform)"] },
+          { "layer": "Bronze", "items": ["Tenant-partitioned Delta tables", "Row-level security policies", "Event dead-letter queue"] },
+          { "layer": "Silver", "items": ["Canonical entity schemas (Users, Events, Resources)", "GDPR PII handling", "Tenant schema canonicalization"] },
+          { "layer": "Gold", "items": ["Pre-aggregated usage metrics (daily/weekly/monthly)", "Churn risk scores", "k-anonymous benchmarks"] },
+          { "layer": "AI", "items": ["Databricks Genie (NL queries)", "Churn prediction (MLflow)", "Usage anomaly detection"] }
+        ],
+        "talkTrack": [
+          "Unity Catalog row-level security means your engineers cannot write a bug that leaks cross-tenant data — isolation is enforced by the database engine, not the application code.",
+          "The shared compute model means your 5,000th tenant costs 10x less to serve than your 1st tenant would under a per-tenant database model — that's the unit economics that make analytics-as-a-feature profitable.",
+          "Databricks Genie lets your enterprise tenants ask 'why did our engagement drop last week?' in plain English and get an accurate answer from their own data — zero additional development from your team."
+        ]
+      }
+    ],
+    "mockInterview": [],
+    "customerQuestions": [
+      {
+        "question": "How can we be certain that Unity Catalog RLS actually prevents cross-tenant data access — couldn't a bug in a query bypass it?",
+        "bestAnswer": "Unity Catalog row-level security is enforced at the query engine level — Databricks evaluates the RLS predicate before executing any query, regardless of what SQL the application sends. Unlike application-layer WHERE clauses, RLS cannot be bypassed by application code, SQL injection, or developer error. We can demonstrate this with a test query that explicitly tries to access another tenant's data — it will return zero rows, not an error, which is the correct behavior.",
+        "notes": "This is the most important technical question for the security-conscious CTO. Prepare a live demo showing RLS enforcement. Use the term 'engine-level' enforcement repeatedly.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      },
+      {
+        "question": "We have some enterprise tenants who require their data to be in a completely separate database. Can we accommodate that?",
+        "bestAnswer": "Yes — Unity Catalog's federated catalog capability can include external databases as catalog sources. For tenants requiring physical separation, we can provision a dedicated Unity Catalog catalog backed by a separate Delta storage location in a dedicated storage account. From the tenant's perspective, the access pattern is the same; the data is physically isolated. This adds per-tenant storage cost but uses the same governance framework across both isolated and shared tenants.",
+        "notes": "Don't over-promise on the one-size-fits-all model. Large enterprise tenants may have genuine requirements for physical separation. The Unity Catalog federated catalog is a good answer here.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      }
+    ],
+    "risks": [
+      {
+        "title": "Unity Catalog RLS Performance at Scale",
+        "description": "Row-level security predicates add computational overhead to every query. At 5,000 concurrent tenant sessions, RLS evaluation overhead could degrade query performance beyond the 5-second SLA.",
+        "likelihood": "Medium",
+        "impact": "Medium",
+        "mitigation": "Benchmark RLS performance with representative query workloads and 5,000 tenant contexts before production. Use Delta Lake Z-ordering on tenant_id to minimize data scanned per tenant query. Pre-aggregate Gold layer metrics to reduce raw query complexity. Implement SQL Warehouse connection pooling to limit concurrent query load."
+      },
+      {
+        "title": "GDPR Deletion Propagation Complexity",
+        "description": "Right-to-be-forgotten requests require deleting user PII from Bronze, Silver, Gold, and any AI model training data that included the user. Delta Lake deletion vectors handle table-level deletion, but model retraining may be required for deep deletions.",
+        "likelihood": "Medium",
+        "impact": "High",
+        "mitigation": "Design PII handling in Silver to minimize personal data propagation to Gold and AI training datasets. Use pseudonymization in Bronze so that deletion of the mapping table effectively de-identifies the data without requiring full record deletion. Document the deletion propagation scope in the GDPR DPA with tenants."
+      },
+      {
+        "title": "Noisy Neighbor at Peak Concurrency",
+        "description": "A single large tenant running a complex analytical query could consume disproportionate SQL Warehouse compute, degrading response times for all other concurrent tenants.",
+        "likelihood": "Medium",
+        "impact": "Medium",
+        "mitigation": "Implement SQL Warehouse query queuing and per-tenant query concurrency limits using Databricks SQL query tags and cluster policies. Assign enterprise tenants to a dedicated SQL Warehouse pool with higher-priority scheduling. Monitor per-tenant query latency in the Databricks observability layer with automatic alerting on SLA breaches."
+      }
+    ],
+    "deliverables": [
+      {
+        "name": "Multi-Tenant Analytics Platform Architecture Blueprint",
+        "purpose": "Comprehensive technical design for the multi-tenant Databricks Lakehouse including Unity Catalog isolation model, tenant onboarding automation, Gold layer product design, and AI insights architecture.",
+        "outline": [
+          "Executive summary and analytics revenue ROI model",
+          "Unity Catalog multi-tenant isolation architecture",
+          "Tenant onboarding automation design (Terraform module)",
+          "Medallion layer design with tenant_id partitioning strategy",
+          "Gold layer pre-aggregated metric store design",
+          "AI insights engine architecture (Genie, churn model, anomaly detection)",
+          "SOC 2 Type II control mapping",
+          "GDPR data residency and deletion automation design",
+          "Scaling analysis and cost model per tenant tier"
+        ]
+      }
+    ],
+    "executiveSummary": {
+      "sponsorReady": "We are building a multi-tenant analytics platform on Databricks that will scale to 5,000 tenants with your current team of 8 engineers, enforce tenant data isolation at the engine level, and deliver AI-powered analytics insights that generate $5M+ in new ARR. This platform is the infrastructure foundation for your analytics-as-a-feature revenue strategy.",
+      "thirtySecond": "Your current schema-per-tenant Redshift architecture hits a wall at 500 tenants. Databricks Lakehouse with Unity Catalog scales to 5,000 tenants with the same team, enforces tenant isolation at the engine level so no developer bug can ever leak cross-tenant data, and delivers AI-powered insights that turn your analytics into a revenue line.",
+      "twoMinute": "Today, onboarding a new tenant to analytics takes 3 days and involves 4 different teams. Your tenant isolation relies on application-layer WHERE clauses that a developer mistake could bypass. Your enterprise customers are asking for AI analytics features you can't build on the current architecture. The Databricks multi-tenant lakehouse solves all of this. Tenant onboarding becomes a 30-minute automated API call. Unity Catalog row-level security enforces isolation at the query engine level — no application code can bypass it. Pre-aggregated Gold layer metrics serve your analytics portal in under 5 seconds at any scale. Databricks Genie gives enterprise tenants natural language querying of their own data. And the churn prediction model you've wanted to build for 2 years becomes a 6-week project on this platform. This is the analytics infrastructure that scales to 5,000 tenants, satisfies SOC 2 and GDPR, and turns analytics into your highest-margin product feature.",
+      "successIn12Months": [
+        "2,000 tenants onboarded with automated sub-hour provisioning",
+        "Analytics portal achieving 60%+ weekly active usage among enterprise tier",
+        "Zero cross-tenant data isolation incidents",
+        "Churn prediction model reducing quarterly ARR loss by 20%",
+        "SOC 2 Type II certification achieved using Unity Catalog audit logging"
+      ]
+    },
+    "meetingChecklist": [
+      "Prepare a Unity Catalog RLS demo showing engine-level isolation enforcement",
+      "Calculate the current onboarding cost in engineer-hours × monthly new tenant volume",
+      "Have the Databricks Genie natural language analytics demo ready",
+      "Prepare cost comparison: per-tenant database model vs shared Unity Catalog model at 5,000 tenants",
+      "Know the customer's current SOC 2 audit status and what gaps the analytics infrastructure represents",
+      "Understand the analytics-as-a-feature pricing model they are considering"
+    ],
+    "nextSteps": [
+      "Schedule a Unity Catalog isolation architecture workshop with the Head of Data Platform and CSO",
+      "Provision a Databricks trial workspace to demonstrate tenant onboarding automation and RLS enforcement",
+      "Define a 50-tenant pilot scope with success criteria and timeline",
+      "Identify 5 enterprise tenants willing to participate in the analytics portal beta",
+      "Deliver a SOC 2 control mapping showing which Unity Catalog features satisfy which audit requirements"
+    ],
+    "whiteboardTalkTrack": [
+      "Draw the current state: dozens of separate databases, manual ETL jobs, shared Redshift with schema-per-tenant",
+      "Show the scaling cliff: at 500 tenants, the current model requires 500 separate database connections, ETL jobs, and schema maintenance operations",
+      "Draw the lakehouse: single Databricks workspace with Auto Loader and DLT ingesting all tenant data with tenant_id tags",
+      "Show Unity Catalog: a single RLS policy per table that enforces isolation at the engine level — explain why this cannot be bypassed",
+      "Show the Gold layer: pre-aggregated per-tenant metrics available to all tenants simultaneously via shared SQL Warehouses",
+      "Show the AI layer: Genie for NL querying, churn model for CS teams, anomaly detection for product health",
+      "Close with the economics: 5,000 tenants with 8 engineers vs the current 500 tenants at the same team size"
+    ],
+    "workshopPlan": [
+      "Morning Session 1 (90 min): Current state architecture review — map the existing per-tenant database model, ETL pipelines, and Redshift setup",
+      "Morning Session 2 (60 min): Tenant isolation requirements — legal, contractual, and regulatory obligations by tenant tier",
+      "Afternoon Session 1 (90 min): Unity Catalog isolation architecture design — RLS policies, tenant registry, onboarding automation design",
+      "Afternoon Session 2 (60 min): Analytics portal and AI insights roadmap — define the feature set and implementation phases",
+      "Wrap-up (30 min): Pilot scope, 50-tenant selection, success metrics, and timeline"
+    ],
+    "objections": [
+      {
+        "objection": "Physical database separation per tenant is the only way to guarantee isolation our enterprise customers will accept.",
+        "response": "Engine-level RLS enforcement is a stronger isolation guarantee than physical database separation in many ways — it's auditable, automatically applied to new tables, and verified on every query rather than relying on database user permissions. However, for specific enterprise tenants with contractual physical separation requirements, Unity Catalog's federated catalog can include a dedicated storage location for those tenants while maintaining the same governance framework. This gives you both models under one control plane."
+      },
+      {
+        "objection": "We're worried about a noisy neighbor — one large tenant's heavy queries affecting all other tenants.",
+        "response": "Databricks addresses this with SQL Warehouse query isolation: each tenant's session runs in an isolated query context, and per-tenant concurrency limits prevent any single tenant from monopolizing warehouse compute. We can also assign your top enterprise tenants to a dedicated SQL Warehouse pool with guaranteed compute allocation. The Gold layer's pre-aggregated metric approach means most tenant queries hit cached aggregates rather than raw data, dramatically reducing the compute load per query."
+      }
+    ]
+  }
+}

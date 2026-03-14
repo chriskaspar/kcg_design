@@ -1,0 +1,521 @@
+{
+  "id": "pharma-rnd-static",
+  "title": "Pharma R&D Knowledge and Data Platform",
+  "updatedAt": "2026-03-14T00:00:00.000Z",
+  "input": {
+    "scenarioTitle": "Pharma R&D Knowledge and Data Platform",
+    "industry": "Life Sciences",
+    "customerType": "Pharma",
+    "problemStatement": "A global pharma R&D organization cannot achieve AI-powered drug discovery because research data, clinical data, scientific literature, lab instrument data, omics datasets, and real-world evidence exist in separate silos — preventing unified research entity analysis, cross-study compound comparisons, and AI-grounded scientific knowledge access.",
+    "businessGoals": "Build a unified R&D knowledge and data platform that integrates lab instruments, genomics/omics, clinical studies, scientific literature, and real-world data into a Research Entity model, powers a grounded AI Research Assistant, and enables cross-study analytics for target identification, biomarker discovery, and pipeline optimization.",
+    "constraints": "Research data contains highly sensitive IP that must be governed with project-level access controls, omics datasets are extremely large (whole genome sequencing can be 100+ GB per sample), literature ingestion must handle copyright restrictions, and research scientists must be able to use the platform without data engineering support.",
+    "timeline": "12 months for core platform and research analytics, 18 months for AI Research Assistant",
+    "currentState": "Lab data lives in individual researchers' laptop folders or shared drives, omics data is in a bioinformatics HPC cluster, clinical study data is in a clinical data warehouse, scientific literature is accessed through PubMed but not integrated with internal research data, and real-world evidence is purchased and stored in spreadsheets with no analysis infrastructure.",
+    "desiredFutureState": "A unified Databricks R&D platform with a Research Entity model integrating all data sources, a vectorized scientific literature knowledge base for RAG-based AI research assistance, cross-study compound analytics, and self-service research analytics for scientists.",
+    "stakeholders": "Chief Scientific Officer, VP Research, VP Computational Biology, Head of Translational Medicine, Head of Bioinformatics, Director of Medical Affairs Research",
+    "compliance": ["21 CFR Part 11 (for GxP-adjacent research)", "GDPR", "Data Use Agreements for external datasets", "IP Protection policies"],
+    "architecturePreference": "Medallion (Bronze/Silver/Gold) on Databricks Lakehouse with Vector Search for literature RAG",
+    "outputDepth": "Comprehensive"
+  },
+  "architecture": {
+    "title": "Pharma R&D Knowledge and Data Platform Architecture",
+    "summary": "A Databricks R&D Lakehouse integrating lab instruments, genomics/omics, clinical studies, scientific literature, and real-world data into a Research Entity model that powers cross-study analytics, biomarker discovery, and a grounded AI Research Assistant for accelerating drug discovery.",
+    "solutionOverview": "Research data from lab instruments, genomics/omics pipelines, clinical studies, scientific literature, and real-world evidence flows into the Databricks Lakehouse via Auto Loader for batch ingestion and Delta Live Tables for instrument data streams. The Bronze layer preserves raw research data with project-level IP access controls. The Silver layer builds Research Entities — unified representations of compounds, targets, biomarkers, and patient cohorts — linking experimental results across studies. The Gold layer materializes research analytics products: compound efficacy profiles, biomarker correlation matrices, target validation evidence summaries, and pipeline opportunity scores. A vector-indexed Literature Knowledge Base enables RAG-based retrieval for the AI Research Assistant, grounding every AI-generated scientific response in peer-reviewed literature and internal research data.",
+    "assumptions": [
+      "Lab instruments can export data in structured formats (CSV, JSON, or instrument-native formats with adaptors)",
+      "Omics data processing pipelines (e.g., GATK for WGS, STAR/SALMON for RNA-seq) run on HPC and output summary tables that can be ingested",
+      "Scientific literature is licensed from PubMed Central (open access) or through institutional journal licenses with appropriate data use agreements",
+      "Databricks Vector Search or an equivalent vector database is available for literature embedding storage",
+      "Research scientists have Python and SQL skills sufficient for self-service analytics notebook development"
+    ],
+    "details": [
+      {
+        "title": "Research Data Sources",
+        "body": "Five primary source categories: Lab Instruments (in-vitro assay results, cell viability data, compound screening outputs, mass spectrometry results from biology and chemistry labs); Genomics/Omics (whole genome sequencing variant call files, RNA-seq expression matrices, proteomics quantification tables, metabolomics datasets processed by HPC bioinformatics pipelines); Clinical Studies (SDTM/ADaM datasets from clinical trials, PK/PD parameters, biomarker endpoints — potentially sourced from the Clinical Trial Data Platform); Scientific Literature (PubMed abstracts, PMC full-text articles, clinical practice guidelines, regulatory review documents, and internal research reports); and Real World Data (de-identified patient claims, EHR data, and disease registry data purchased under data use agreements)."
+      },
+      {
+        "title": "Research Entity Model",
+        "body": "The Silver layer builds canonical Research Entities: Compound (chemical identifier, structure, experimental activity profile, ADME/tox summary, clinical stage, and all associated assay results); Target (gene/protein identifier, disease association evidence, druggability assessment, expression data, and genetic validation); Biomarker (biomarker type, disease context, clinical validation evidence, assay results, and predictive model performance); and Patient Cohort (disease indication, genetic stratification, response data, and RWD prevalence). These entities are linked across studies using standard chemical identifiers (InChI, SMILES) and biological identifiers (UniProt, Ensembl)."
+      },
+      {
+        "title": "Literature Knowledge Base",
+        "body": "Scientific literature (abstracts and full-text where licensed) is processed through a chunking and embedding pipeline using Databricks notebooks. Each chunk is embedded using a life sciences language model and stored in a Databricks Vector Search index with metadata (PMID, title, author, year, journal, MeSH terms). The Knowledge Base supports RAG retrieval for the AI Research Assistant and enables structured literature mining for competitive intelligence and evidence synthesis."
+      },
+      {
+        "title": "AI Research Assistant",
+        "body": "The Grounded Research AI Assistant provides research scientists with a conversational interface for scientific discovery questions. The assistant uses RAG over the Literature Knowledge Base and the Gold layer Research Entity data to answer questions like: 'What is the evidence for Target X in Disease Y?' 'Which compounds in our library showed activity against Target Z?' 'What biomarkers predicted response to Drug A in published trials?' All answers include citations to source documents and internal data with traceable provenance."
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-lab",
+        "label": "Lab Instruments",
+        "iconId": "source-lab-instruments",
+        "vendor": "generic",
+        "notes": "In-vitro assay results, cell viability measurements, compound screening data, and mass spectrometry outputs from biology and chemistry research laboratories",
+        "x": 60,
+        "y": 80,
+        "metadata": { "group": "Research Sources" }
+      },
+      {
+        "id": "n-omics",
+        "label": "Genomics / Omics",
+        "iconId": "source-omics",
+        "vendor": "generic",
+        "notes": "WGS variant call files (VCF), RNA-seq expression matrices (TPM), proteomics quantification, and metabolomics datasets from HPC bioinformatics pipelines",
+        "x": 60,
+        "y": 200,
+        "metadata": { "group": "Research Sources" }
+      },
+      {
+        "id": "n-clinical",
+        "label": "Clinical Studies",
+        "iconId": "source-clinical-studies",
+        "vendor": "generic",
+        "notes": "SDTM/ADaM clinical trial datasets, PK/PD parameters, biomarker endpoints, and patient-level response data from Phase 1-3 studies",
+        "x": 60,
+        "y": 320,
+        "metadata": { "group": "Research Sources" }
+      },
+      {
+        "id": "n-lit",
+        "label": "Scientific Literature",
+        "iconId": "source-scientific-literature",
+        "vendor": "generic",
+        "notes": "PubMed abstracts, PMC full-text articles, clinical practice guidelines, regulatory review documents, and internal research reports and whitepapers",
+        "x": 60,
+        "y": 440,
+        "metadata": { "group": "Research Sources" }
+      },
+      {
+        "id": "n-rwd",
+        "label": "Real World Data",
+        "iconId": "source-rwd",
+        "vendor": "generic",
+        "notes": "De-identified patient claims, EHR datasets, and disease registry data purchased under data use agreements for epidemiology and target validation",
+        "x": 60,
+        "y": 560,
+        "metadata": { "group": "Research Sources" }
+      },
+      {
+        "id": "n-autoloader",
+        "label": "Auto Loader",
+        "iconId": "databricks-data-ingestion",
+        "vendor": "databricks",
+        "notes": "Batch ingestion for lab assay files, omics summary tables from HPC, clinical datasets, and RWD files with project-level tagging and schema evolution",
+        "x": 300,
+        "y": 200,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-dlt",
+        "label": "Delta Live Tables",
+        "iconId": "databricks-dlt",
+        "vendor": "databricks",
+        "notes": "DLT pipelines for literature ingestion, embedding pipeline orchestration, and incremental clinical study data loading with data quality expectations",
+        "x": 300,
+        "y": 420,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-bronze",
+        "label": "Bronze Layer",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Raw research data in Delta format with project-level IP access controls, data source attribution, and full provenance for reproducibility",
+        "x": 560,
+        "y": 300,
+        "metadata": { "group": "Bronze Layer" }
+      },
+      {
+        "id": "n-silver",
+        "label": "Silver Layer (Research Entities)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Canonical Research Entities: Compound (InChI-resolved, with activity profile), Target (UniProt-linked, with validation evidence), Biomarker (with assay and clinical data), Patient Cohort (with RWD prevalence)",
+        "x": 760,
+        "y": 300,
+        "metadata": { "group": "Silver Layer" }
+      },
+      {
+        "id": "n-gold",
+        "label": "Gold Layer (Research Products)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Compound efficacy profiles, biomarker correlation matrices, target validation evidence summaries, pipeline opportunity scores, and cross-study analytics products",
+        "x": 960,
+        "y": 300,
+        "metadata": { "group": "Gold Layer" }
+      },
+      {
+        "id": "n-kb",
+        "label": "Knowledge Base (Literature Index)",
+        "iconId": "generic-knowledgebase",
+        "vendor": "generic",
+        "notes": "Databricks Vector Search index storing literature embeddings with metadata for RAG retrieval — updated continuously as new literature is ingested and processed",
+        "x": 960,
+        "y": 480,
+        "metadata": { "group": "Gold & Knowledge" }
+      },
+      {
+        "id": "n-uc",
+        "label": "Unity Catalog",
+        "iconId": "databricks-governance",
+        "vendor": "databricks",
+        "notes": "Project-level IP access controls, data use agreement compliance tracking, research entity lineage, and data classification for competitive sensitivity",
+        "x": 760,
+        "y": 560,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-analytics",
+        "label": "Research Analytics",
+        "iconId": "databricks-notebooks",
+        "vendor": "databricks",
+        "notes": "Self-service research analytics notebooks for scientists: compound SAR analysis, biomarker correlation, target expression profiling, and cohort comparison",
+        "x": 1200,
+        "y": 200,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-ai",
+        "label": "Grounded Research AI Assistant",
+        "iconId": "databricks-genie",
+        "vendor": "databricks",
+        "notes": "RAG-based AI assistant for research scientists: answers target validation, compound activity, biomarker, and disease biology questions grounded in literature and internal data",
+        "x": 1200,
+        "y": 440,
+        "metadata": { "group": "Analytics & AI" }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n-lab", "target": "n-autoloader", "label": "Assay data files", "protocol": "File/API" },
+      { "id": "e2", "source": "n-omics", "target": "n-autoloader", "label": "Omics summary tables", "protocol": "HPC transfer" },
+      { "id": "e3", "source": "n-clinical", "target": "n-autoloader", "label": "SDTM/ADaM datasets", "protocol": "SFTP/API" },
+      { "id": "e4", "source": "n-lit", "target": "n-dlt", "label": "Literature ingest pipeline", "protocol": "API/PubMed" },
+      { "id": "e5", "source": "n-rwd", "target": "n-autoloader", "label": "RWD files", "protocol": "SFTP" },
+      { "id": "e6", "source": "n-autoloader", "target": "n-bronze", "label": "Project-tagged Delta write", "protocol": "Delta" },
+      { "id": "e7", "source": "n-dlt", "target": "n-bronze", "label": "Literature raw Delta write", "protocol": "Delta" },
+      { "id": "e8", "source": "n-bronze", "target": "n-silver", "label": "Research entity resolution", "protocol": "Spark" },
+      { "id": "e9", "source": "n-silver", "target": "n-gold", "label": "Analytics product aggregation", "protocol": "Spark" },
+      { "id": "e10", "source": "n-silver", "target": "n-uc", "label": "IP and DUA governance", "protocol": "Unity Catalog" },
+      { "id": "e11", "source": "n-gold", "target": "n-uc", "label": "Research product registration", "protocol": "Unity Catalog" },
+      { "id": "e12", "source": "n-bronze", "target": "n-kb", "label": "Literature embedding pipeline", "protocol": "Vector Search" },
+      { "id": "e13", "source": "n-gold", "target": "n-analytics", "label": "Research data access", "protocol": "SQL" },
+      { "id": "e14", "source": "n-kb", "target": "n-ai", "label": "RAG retrieval", "protocol": "Vector Search" },
+      { "id": "e15", "source": "n-gold", "target": "n-ai", "label": "Internal research context", "protocol": "REST" },
+      { "id": "e16", "source": "n-uc", "target": "n-ai", "label": "Project-scoped data access", "protocol": "Unity Catalog" }
+    ],
+    "refinements": [
+      "Add a competitive intelligence AI that monitors competitor pipeline announcements, patent filings, and clinical trial registrations and surfaces relevant updates to research teams",
+      "Build a target identification model that scores novel targets using multi-omics evidence, disease genetics (GWAS), and literature co-citation networks",
+      "Implement a drug repurposing analytics layer that identifies existing compound-indication matches from the Research Entity compound library and RWD evidence",
+      "Add chemical structure search capability using RDKit embedded in Databricks for substructure and similarity searching across the compound library",
+      "Build an automated literature review tool that generates evidence summaries for targets and compounds from the Literature Knowledge Base"
+    ]
+  },
+  "architectAnswers": {
+    "why_w1": "Research scientists at the company are spending 40-50% of their time on data retrieval and integration rather than scientific hypothesis generation and experimental design. Lab data exists in shared drives, omics data requires HPC access and bioinformatics expertise to query, clinical data requires a ticket to the clinical data team, and literature review is done manually by reading individual papers. A unified platform with self-service access reduces the data access overhead and returns time to science.",
+    "why_w2": "The company's pipeline has multiple Phase 2 compounds that need translational biomarker packages for Phase 3 decision-making. These biomarker analyses require integrating Phase 1/2 clinical biomarker data with target expression data from omics, assay activity data from the biology labs, and clinical evidence from the literature — exactly the cross-source integration that the Research Entity model in Silver provides. Without this platform, each biomarker analysis is a 3-month custom project.",
+    "why_w3": "A major competitor recently published a paper identifying a novel target in the company's primary disease area using a multi-omics approach. The company had the relevant internal data — omics profiles, assay results, RWD epidemiology — but it was siloed in different systems with no way to rapidly reproduce or extend the competitor's analysis. This competitive intelligence gap demonstrates the cost of data fragmentation to the CSO.",
+    "why_h1": "The bioinformatics HPC cluster is a bottleneck: with 50+ researchers waiting for compute time, omics analyses take weeks to queue and run. Moving processed omics summary tables (not raw sequencing data) to Databricks as the analytics layer enables researchers to query 200TB+ of omics data using SQL without waiting in the HPC queue — dramatically accelerating iterative hypothesis testing.",
+    "why_h2": "The scientific literature is the most under-leveraged research asset. The company's researchers have access to millions of scientific papers through journal licenses, but literature review is entirely manual — one paper at a time. A vector-indexed literature knowledge base enables semantic search across the entire literature corpus, finding relevant papers that manual PubMed searches would miss, and an AI assistant can synthesize evidence across hundreds of papers in seconds.",
+    "why_h3": "Real-world data purchased from third-party vendors sits largely unused in spreadsheets because the bioinformatics team doesn't have the bandwidth to analyze it, and the clinical teams that need it don't have the analytical tools to query it. Integrating RWD into the Research Entity model enables the translational medicine team to use it for target validation, patient stratification, and indication expansion analyses without requiring bioinformatics support.",
+    "goal_g1": "The primary goal is a Research Entity model in Silver for at least 200 compounds (covering all active pipeline programs), 500 validated targets (covering all therapeutic areas), and 50 disease-relevant biomarkers — with experimental activity data, omics evidence, and clinical data linked through standard chemical and biological identifiers by month 12.",
+    "goal_g2": "The AI Research Assistant must achieve a minimum 80% scientist satisfaction rate in pilot evaluation — measured by whether the assistant's answer to a research question is judged as accurate, relevant, and properly cited by domain expert reviewers. Below 80%, the assistant erodes rather than builds research productivity.",
+    "goal_o1": "Research analytics self-service target: 70% of common research data access requests (compound activity summary, target expression profile, biomarker correlation) should be fulfillable by a scientist using a platform notebook template without requiring support from the data engineering or bioinformatics teams. This shifts data team capacity from serving requests to developing new analytical capabilities.",
+    "goal_o2": "Literature synthesis efficiency: the time required to produce a target validation evidence summary (current: 2-4 weeks of manual literature review per target) should be reduced to 2-3 days using the AI Research Assistant for initial synthesis followed by expert review and refinement. This directly accelerates the target selection process for new program initiation.",
+    "goal_a1": "The omics analytics layer must support queries across 200TB+ of RNA-seq expression matrices for 10,000+ samples with sub-30-second query performance for standard expression analysis queries (e.g., differential expression between cohorts, correlation with compound activity). Delta Lake Z-ordering on gene_id and sample cohort fields optimizes these queries.",
+    "goal_a2": "The Literature Knowledge Base must support real-time RAG retrieval with under 2-second response time for a typical semantic search across 2 million+ literature chunks. Databricks Vector Search with approximate nearest neighbor indexing delivers this performance without pre-caching all possible queries.",
+    "goal_l1": "Project-level IP access controls are the most critical governance requirement: research data for Drug A's program cannot be accessible to scientists working on Drug B's program without explicit cross-project authorization. Unity Catalog row-level security policies use project_id as the access predicate, enforced at the engine level for all data in Bronze, Silver, and Gold.",
+    "goal_l2": "Data use agreement compliance for external datasets: RWD purchased from vendors has specific permitted uses defined in data use agreements. Unity Catalog data classifications tag each RWD dataset with its DUA terms. Access policies enforce that RWD can only be used for the permitted indications and cannot be shared externally. Annual DUA compliance audits are supported by Unity Catalog access logs.",
+    "safe_s1": "IP protection is the highest priority security requirement. Research data representing pre-patent compound activity, unpublished target identification, or clinical biomarker data that is strategically sensitive must be protected against both external breach and internal unauthorized access. Databricks workspace encryption, VPC isolation, and Unity Catalog project-level access controls provide layered IP protection.",
+    "safe_s2": "GDPR compliance for clinical research data: patient-level clinical trial data containing European subjects requires GDPR-compliant processing. Pseudonymization is applied to clinical data in the Bronze layer — subject identifiers are replaced with study-specific codes before the data is available in the Research Entity Silver layer. The mapping between subject codes and patient identities is retained in the GxP clinical system, not in the R&D lakehouse.",
+    "safe_a1": "Literature ingestion copyright compliance: scientific literature licensed through institutional agreements may not be shared publicly or used for commercial AI training without specific licensing terms. The Literature Knowledge Base stores embeddings (vector representations) rather than full text for most papers. Full-text retrieval is limited to PubMed Central open-access papers and documents owned by the company. Copyright terms are tracked per publication in the knowledge base metadata.",
+    "safe_a2": "The AI Research Assistant citations are auditable: every AI-generated response includes a traceable citation list. When a scientist acts on an AI recommendation and the action is consequential (e.g., progressing a compound to the next development stage based in part on AI-synthesized evidence), the citation trail provides evidence of the scientific rationale for regulatory and IP documentation purposes.",
+    "safe_f1": "Research data reproducibility is a scientific integrity requirement: experimental results stored in the Bronze layer are immutable after the data curation quality review is complete. The quality review process (conducted by a data curator) validates that raw data matches the instrument file and the lab notebook entry. After curation approval, the Bronze record is locked from modification — corrections are appended as new records with a correction flag.",
+    "safe_e1": "Research platform RTO: 4 hours (scientists can tolerate a work disruption of up to 4 hours before losing a day's productivity). RPO: 24 hours (daily backup of the Bronze layer research archive). Delta Lake transaction logs are replicated to a secondary region. The Literature Knowledge Base vector index is rebuilt from Bronze embeddings in the event of index corruption.",
+    "safe_e2": "Research data backup is separate from the production platform: the Bronze layer raw research data is backed up to a separate long-term archive storage tier (S3 Glacier or Azure Archive) with 11-nines durability. This archive is the company's scientific data asset — irreplaceable experimental results that took years to generate. Monthly restoration tests verify archive integrity.",
+    "flow_f1": "Data flows: Lab assay files (daily) → Auto Loader → Bronze → Compound Research Entity Silver update → Gold compound efficacy profile refresh. Omics summary tables (monthly, post-HPC processing) → Auto Loader → Bronze → Target and Biomarker Silver entities → Gold expression correlation products. Literature (weekly PubMed delta) → DLT → Bronze → embedding pipeline → Literature Knowledge Base vector index update.",
+    "flow_l1": "Literature ingestion is the most operationally complex flow: PubMed MEDLINE data is downloaded weekly (new and updated records); full-text articles are retrieved for open-access (PMC) articles and licensed journals; text is chunked into 512-token segments; each chunk is embedded using a life sciences language model (e.g., BioMedBERT); embeddings are stored in the Databricks Vector Search index. The full pipeline for 10,000 new articles takes approximately 4 hours on a DLT pipeline with GPU-accelerated embedding.",
+    "flow_o1": "Research data quality flow: lab assay data quality is validated at ingestion using instrument-specific quality rules (e.g., assay acceptance criteria: positive control Z-prime > 0.5, negative control signal within 2 SD of historical mean). Omics data is validated against bioinformatics pipeline QC metrics (RNA integrity number, alignment rate, sequencing depth). Failing QC records are flagged for scientist review before Silver layer integration.",
+    "flow_w1": "Databricks Workflows orchestrates: daily lab data ingestion and Research Entity update (available by 8 AM each day); weekly literature PubMed delta processing and knowledge base update; monthly HPC omics data transfer and omics Research Entity refresh; quarterly AI Research Assistant model evaluation and fine-tuning. Research scientists are notified by Slack when their project's data refresh is complete.",
+    "data_d1": "Core Research Entity data domains: Compound (InChI key, SMILES, canonical name, CAS number, ChEMBL ID, molecular weight, logP, assay activity data by target, ADME parameters, safety flags, clinical stage, patent status); Target (UniProt ID, gene symbol, disease associations from Open Targets, expression data from GTEx and internal RNA-seq, genetic validation from GWAS, druggability assessment); Biomarker (biomarker type — prognostic, predictive, pharmacodynamic — disease context, assay method, clinical validation studies, published sensitivity/specificity).",
+    "data_d2": "Omics data schema requires specialized handling: RNA-seq expression matrices are stored as sparse Delta tables (gene_id × sample_id with TPM value) rather than dense matrices, enabling efficient querying by gene or by sample cohort without loading the full matrix. VCF variant data is stored in Parquet format with Delta Lake, indexed by chromosome and genomic position using Z-ordering for genomic range queries. Proteomics and metabolomics data are stored in a long format (sample_id, feature_id, abundance_value, QC_flags) for analytical compatibility with the compound and biomarker entity models.",
+    "data_a1": "Compound identity resolution is the most complex data challenge in research entity building: the same compound may be referenced by CAS number in chemistry systems, by ChEMBL ID in biology systems, by SMILES string in assay databases, and by compound name in clinical studies. The Silver layer uses InChI key as the canonical compound identifier, with a compound synonym table mapping all other identifier types. ChEMBL's publicly available compound identifier mapping table is used as the foundation for the synonym table.",
+    "data_a2": "Literature quality for RAG applications: scientific literature varies dramatically in quality, relevance, and recency. The knowledge base implements a relevance scoring system that up-weights recent publications, high-impact journals, and papers from disease-relevant therapeutic areas when returning RAG results. Retracted papers are flagged and excluded from retrieval. Pre-prints (bioRxiv, medRxiv) are included but clearly labeled as non-peer-reviewed in AI responses.",
+    "data_t1": "Standard biological ontologies are used throughout the Research Entity model: Gene Ontology (GO) for molecular function and biological process annotation; Disease Ontology (DO) for disease-target association classification; ChEBI for chemical entity classification; MeSH for literature topic indexing. These ontologies are loaded as reference tables in Unity Catalog and updated quarterly from their source databases.",
+    "data_t2": "The Gold layer research analytics use a pivot-ready matrix format for multi-omics integration: the compound-target activity matrix (compound × target with activity value) and the omics feature correlation matrix (gene × gene or gene × compound with correlation coefficient) are pre-computed and stored as wide-format Delta tables that support efficient bioinformatics analysis patterns used by computational biology teams.",
+    "data_a3": "Research data has scientific permanence requirements that differ from commercial data: raw experimental data is retained indefinitely because it may be relevant to scientific questions that arise years after the data was generated. Delta Lake time travel enables point-in-time reconstruction of Research Entity states as of any date — important for scientific reproducibility when a paper published today must be recreated from data available 2 years ago.",
+    "data_a4": "Data provenance for published research: when scientists publish findings that rely on the R&D platform, Unity Catalog provides the data lineage from published tables (e.g., the Gold biomarker correlation matrix used in a paper figure) back through the Silver Research Entities and Bronze raw data — supporting reproducibility and data availability statements required by journals.",
+    "fast_f1": "The fastest path to value is making the company's internal compound library queryable with an activity summary — allowing scientists to answer 'which of our compounds have activity against Target X?' in seconds rather than days. An Auto Loader ingestion of the compound registration system and assay database, followed by a Silver compound entity build, can be delivered in 6-8 weeks and immediately changes the research team's day-to-day capability.",
+    "fast_f2": "The AI Research Assistant on top of PubMed Central open-access literature (7 million+ articles available for free) can be deployed in 4-6 weeks as a pilot, before any internal research data is integrated. This demonstrates the RAG capability immediately and builds scientist confidence in the platform before the more complex internal data integration begins.",
+    "fast_a1": "The 14-week rapid deployment plan: Weeks 1-3 cover infrastructure, Unity Catalog project-level access model, and Auto Loader for compound registration and top 5 assay databases. Weeks 4-6 deliver Bronze compound data and Silver Compound Research Entity with activity summary. Weeks 7-9 add literature ingestion and Vector Search knowledge base for PubMed Central. Weeks 10-12 deliver the AI Research Assistant pilot and compound analytics notebooks. Weeks 13-14 add omics integration and the first biomarker correlation product.",
+    "fast_a2": "Platform champions are essential: identify 3-5 computational scientists who are the most influential members of the research community and recruit them as platform co-designers. Their endorsement of the platform to their colleagues is worth more than any marketing — if the star computational biologist says 'I use this every day and it's transformed my research productivity,' the rest of the team will adopt it.",
+    "fast_s1": "90-day quick wins: (1) Compound activity browser showing all assay data for any compound in the library; (2) AI Research Assistant pilot on PubMed Central answering target validation questions; (3) RNA-seq expression data for 1,000 samples queryable by SQL without HPC access; (4) Cross-study biomarker correlation notebook for translational medicine team. Each win is visible to the CSO and VP Research.",
+    "fast_t1": "Open-source bioinformatics tools (RDKit for chemistry, BioPython for sequence analysis, Scanpy for single-cell omics) have Databricks-compatible Python packages available. Pre-built notebooks for common bioinformatics analyses (differential expression, compound SAR analysis, GWAS enrichment) are available on Databricks GitHub and the Databricks marketplace, reducing custom development time by 60-70%.",
+    "fast_t2": "The Databricks Vector Search and AI Gateway enable a production-quality RAG system in days rather than months. Using a pre-trained life sciences language model (PubMedBERT, BioBERT) for embedding reduces fine-tuning time. The embedding pipeline for 2 million PubMed Central abstracts runs in under 8 hours on a GPU-enabled DLT pipeline, delivering the initial Literature Knowledge Base rapidly.",
+    "run_r1": "Platform operations: 3 data engineers manage ingestion pipelines and Research Entity maintenance; 3 computational scientists serve as platform champions and develop new analytical notebooks; 1 bioinformatics engineer manages omics data pipelines and HPC-to-cloud transfer; 1 AI/ML engineer manages the Research Assistant and embedding pipeline. Research scientists operate the platform for self-service analytics without data engineering support.",
+    "run_r2": "Omics data storage cost optimization is critical at 200TB+ scale: Delta Lake Z-ordering reduces query compute cost by 70-80% for targeted queries. Parquet format with Snappy compression reduces storage cost by 5-10x compared to raw text formats. Cold data (omics datasets older than 2 years with no recent access) is moved to object storage cold tiers at 80% cost reduction. Databricks autoscaling compute ensures omics analytics only consume compute when queries are running.",
+    "run_u1": "The AI Research Assistant is monitored for answer quality using a sampling-based evaluation pipeline: 5% of scientist queries are randomly selected for expert review, with a quality score (accurate/inaccurate, relevant/irrelevant, well-cited/uncited). Quality scores are tracked in MLflow. When accuracy drops below 80% for a therapeutic area, the knowledge base for that area is refreshed with more recent literature and the RAG retrieval parameters are tuned.",
+    "run_u2": "Research Entity model updates are managed through a versioned schema approach: new data sources can add new fields to the Compound, Target, or Biomarker entities without breaking existing queries. Breaking schema changes (field renames, type changes) go through a data schema review process with affected analytical notebook owners notified before the change is deployed.",
+    "run_n1": "The R&D platform is deployed in the company's primary cloud region with strict network controls: HPC-to-cloud data transfer uses a dedicated high-bandwidth private connection. External literature API access (PubMed, EBI APIs) is allowed through approved egress rules. No research data is transmitted to external AI APIs without explicit IP review — LLM inference for the AI Research Assistant runs on Databricks Model Serving using an internally deployed model or a commercially licensed API with appropriate data use terms.",
+    "win_w1": "Platform success metrics at 18 months: (1) 200+ compounds with complete Research Entity data in Silver; (2) AI Research Assistant achieving 80%+ scientist satisfaction in pilot evaluation; (3) 70% of common data access requests fulfilled self-service without data engineering tickets; (4) Target validation evidence summary time reduced from 4 weeks to 1 week; (5) 3+ research publications citing platform-enabled analyses.",
+    "win_i1": "Research productivity impact: $15M estimated value from accelerating 3 pipeline compounds through target validation faster than the current process allows; $5M in competitive intelligence value from earlier identification of competitor target programs; $3M in bioinformatics team productivity from HPC queue elimination; $2M annually in avoided redundant experiments from comprehensive compound activity visibility. Total 3-year impact: $50M.",
+    "win_n1": "Over 5 years, the R&D Knowledge Platform becomes the company's most valuable research infrastructure. The compound-target-disease knowledge graph, built from years of proprietary experimental data and literature synthesis, becomes a strategic asset that no competitor can replicate quickly. AI models trained on this proprietary data identify novel target-indication combinations that would take 3-5 years of human research to discover — potentially identifying the company's next blockbuster compound from within its existing library."
+  },
+  "story": {
+    "strategy": "The pharma R&D organization built the Research Entity model as the scientific intelligence layer — a unified representation of the company's knowledge about every compound, target, and biomarker — rather than starting with analytics infrastructure. By grounding the architecture in scientific entities rather than data systems, the platform naturally integrates across sources and directly serves the scientific questions that drive drug discovery decisions.",
+    "technology": "The platform uses Databricks for all analytical workloads — from Delta Lake SQL queries on 200TB+ omics data to GPU-accelerated literature embedding with Databricks Vector Search. The Research Entity Silver layer uses InChI key and UniProt ID as canonical identifiers, enabling seamless integration of chemistry, biology, and clinical data that previously spoke different languages. The AI Research Assistant runs on Databricks AI Gateway with RAG over the Literature Knowledge Base, ensuring every AI response is grounded in peer-reviewed evidence with traceable citations.",
+    "outcome": "Within 18 months, the platform housed Research Entities for 280 compounds, 680 targets, and 75 biomarkers with integrated experimental, omics, and clinical evidence. Scientists reported 45% reduction in data retrieval time. The AI Research Assistant answered 3,500+ queries in its first quarter with 82% satisfaction rating. Most significantly, a computational biology team used the platform to identify a novel biomarker for patient stratification in a Phase 2 trial — a analysis that would have taken 3 months manually was completed in 2 weeks using the Research Entity correlation analytics.",
+    "returnValue": "First-year quantified impact: $8M in accelerated program decisions from Research Entity analytics; $4.5M in bioinformatics team productivity from HPC query elimination; $2.8M in eliminated redundant experiments from compound activity visibility; $1.5M in literature review time savings from AI Research Assistant. Total first-year: $16.8M against a $3.2M platform investment — 5.25:1 ROI, with compounding returns as the Research Entity data asset grows.",
+    "years": "Over 5 years, the compound-target-disease knowledge graph becomes the company's most valuable proprietary data asset — representing decades of experimental results, clinical evidence, and synthesized literature in a queryable, AI-accessible form that no external competitor can replicate. AI models trained on this proprietary data achieve target identification accuracy that exceeds what any individual scientist or external tool can provide. The R&D platform transforms from a research productivity tool to a core competitive advantage that accelerates the company's drug discovery engine by 30-40% compared to traditional approaches."
+  },
+  "playbook": {
+    "scenarioTitle": "Pharma R&D Knowledge and Data Platform",
+    "scenarioSummary": "A global pharma R&D organization needs a unified knowledge platform integrating lab instruments, genomics/omics, clinical studies, scientific literature, and RWD into a Research Entity model on Databricks. The platform powers cross-study analytics, AI-grounded research assistance, and self-service bioinformatics — accelerating drug discovery and target validation.",
+    "businessDrivers": [
+      "Research scientists spend 40-50% of their time on data retrieval rather than hypothesis generation and experimental design",
+      "Target validation evidence packages require 2-4 weeks of manual literature review that AI synthesis could reduce to days",
+      "Cross-study compound analytics require custom 3-month data integration projects that should be self-service",
+      "Competitor published a multi-omics target identification paper before the company could act on its own equivalent data",
+      "RWD purchased for $2M annually sits largely unanalyzed due to lack of analytics infrastructure"
+    ],
+    "constraints": [
+      "Project-level IP access controls are mandatory — pre-patent research data must be isolated by program",
+      "Data use agreements restrict specific uses of external RWD and must be enforced at the platform governance layer",
+      "Literature ingestion must respect copyright — full text storage limited to open-access and licensed content"
+    ],
+    "recommendedEngagementApproach": [
+      "Start with a compound activity browser POC using the existing compound registration and assay data — this demonstrates immediate value to research scientists",
+      "Pilot the AI Research Assistant on PubMed Central open-access literature to demonstrate RAG capability before internal data integration",
+      "Identify 3-5 computational science champions who will co-design the Research Entity model with domain expertise",
+      "Propose a 6-month pilot covering one therapeutic area before the full enterprise rollout"
+    ],
+    "confidenceRating": 84,
+    "recommendedConversationPath": [
+      "Research productivity: How much time do scientists spend finding and integrating data vs doing science?",
+      "Competitive intelligence: Has the team experienced situations where a competitor moved faster because of better data integration?",
+      "Omics scale: What omics modalities are in use, what sample volumes, and what HPC bottlenecks exist?",
+      "AI readiness: What AI use cases is the CSO most excited about for accelerating discovery?",
+      "IP sensitivity: What are the data access control requirements for pre-patent research programs?"
+    ],
+    "discoveryQuestions": [
+      {
+        "category": "Research Productivity",
+        "question": "When a scientist wants to understand everything the company knows about a specific target — all assay data, expression profiles, clinical evidence, and literature — how long does that take and what systems do they need to access?",
+        "whyItMatters": "This question quantifies the Research Entity value proposition in the most visceral terms. The answer typically reveals a days-to-weeks process involving multiple systems, email requests, and manual compilation.",
+        "goodSignal": "3-5 days across 4+ systems with email requests to multiple teams — a massive improvement opportunity.",
+        "redFlag": "The company already has a scientific knowledge graph (e.g., Elsevier's Life Sciences Semantic Knowledge Graph, Informa Pharma Intelligence) — the use case is augmenting external data with internal data rather than building from scratch."
+      },
+      {
+        "category": "Omics Infrastructure",
+        "question": "What is the current HPC compute queue wait time for bioinformatics jobs, and how does this affect the pace of omics-based discovery?",
+        "whyItMatters": "HPC queue time is the most acute bioinformatics productivity bottleneck. If researchers wait 2-4 weeks for compute, this directly slows every omics-dependent research decision.",
+        "goodSignal": "2-4 week HPC queue wait times with 20+ researchers sharing the cluster — immediate productivity gain from moving analytics to Databricks.",
+        "redFlag": "HPC is under-utilized with no queue wait time — the bottleneck is data access, not compute. Refocus on data integration and self-service access rather than compute cost savings."
+      },
+      {
+        "category": "Literature Review",
+        "question": "How are scientists currently conducting literature reviews for target validation, and is there a formal systematic review process or is it individual ad-hoc reading?",
+        "whyItMatters": "Individual ad-hoc literature review is highly variable in completeness and reproducibility — exactly the problem the AI Research Assistant addresses. Formal systematic review processes already exist but are too slow to influence timely drug discovery decisions.",
+        "goodSignal": "Individual ad-hoc reading with no systematic process — high variability, high automation potential.",
+        "redFlag": "Already using a systematic literature review tool (e.g., Nested Knowledge, Covidence) — the use case is integration with internal data rather than replacing the literature review tool."
+      },
+      {
+        "category": "IP Sensitivity",
+        "question": "What is the current data access control model for pre-patent research programs, and have there been any IP leakage concerns related to research data access?",
+        "whyItMatters": "IP protection requirements determine the Unity Catalog governance architecture. Any past IP incident creates urgency for project-level access controls.",
+        "goodSignal": "Current controls are inadequate (shared drives with no project-level access), and IP counsel has flagged concerns — strong mandate for project-level Unity Catalog governance.",
+        "redFlag": "Highly restrictive controls already in place (air-gapped research computing environment) — cloud deployment may face resistance from IP counsel. Significant architecture discussion required."
+      },
+      {
+        "category": "AI Readiness",
+        "question": "What is the CSO and VP Research's view on AI-assisted drug discovery, and are there specific AI use cases they consider highest priority?",
+        "whyItMatters": "Leadership AI vision determines platform investment priority and adoption energy. Target identification, biomarker discovery, and compound repurposing are the highest-ROI AI use cases that drive platform investment justification.",
+        "goodSignal": "CSO has publicly committed to AI-powered discovery and has specific programs where AI guidance is expected to influence decisions within 18 months.",
+        "redFlag": "Leadership is AI-skeptical and sees AI only as hype — platform investment must be justified entirely on data integration and analytics productivity rather than AI capability."
+      }
+    ],
+    "problemFraming": {
+      "statement": "A global pharma R&D organization cannot achieve its AI-powered drug discovery vision because research data — lab results, omics, clinical evidence, literature — is fragmented across systems, shared drives, and HPC clusters with no unified Research Entity model, no self-service analytics capability, and no AI research assistance grounded in the company's proprietary data.",
+      "desiredOutcomes": [
+        "Research Entity model for 200+ compounds, 500+ targets, and 50+ biomarkers with integrated experimental, omics, and clinical evidence",
+        "AI Research Assistant achieving 80%+ scientist satisfaction with grounded, cited answers to target validation questions",
+        "HPC queue bottleneck eliminated for analytical omics queries through SQL-accessible Delta Lake omics tables",
+        "Target validation evidence summary time reduced from 4 weeks to 1 week",
+        "70% of common data access requests fulfilled self-service without data engineering support"
+      ],
+      "assumptions": [
+        "Compound registration system and key assay databases provide API or batch export access",
+        "HPC omics pipeline outputs (VCF, expression matrices) can be transferred to cloud storage",
+        "Scientific literature licensing terms permit storage of embeddings (not full text) for RAG applications",
+        "Computational science champions can commit time to co-design the Research Entity model"
+      ],
+      "nonNegotiables": [
+        "Project-level IP access controls enforced at engine level for all pre-patent research data",
+        "Data use agreement terms enforced for external RWD at the platform governance layer",
+        "AI Research Assistant responses must always include traceable citations to source documents"
+      ],
+      "unknowns": [
+        "IP counsel's position on cloud storage for pre-patent compound activity data",
+        "Copyright terms for journal-licensed content and permissibility of vector embedding storage",
+        "Scientist adoption of AI-assisted research workflows vs traditional search and reading approaches"
+      ],
+      "framingStatement": "By building a unified R&D Knowledge Platform on Databricks that integrates all research data sources into canonical Research Entities and grounds AI assistance in the company's proprietary scientific knowledge, we create the data infrastructure that transforms pharma R&D from a data-constrained process to an intelligence-accelerated discovery engine."
+    },
+    "architectureOptions": [
+      {
+        "name": "Research Entity Lakehouse with Literature RAG",
+        "summary": "A medallion architecture with canonical Research Entities in Silver, cross-study analytics in Gold, and a Vector Search literature knowledge base powering the AI Research Assistant — designed for AI-enabled drug discovery.",
+        "whenToUse": [
+          "Multi-modality research data requiring compound/target/biomarker entity resolution",
+          "AI Research Assistant requiring RAG over scientific literature and internal research data",
+          "200TB+ omics datasets requiring SQL-accessible analytics without HPC queue dependence",
+          "Project-level IP access control requirements for pre-patent research programs"
+        ],
+        "benefits": [
+          "Research Entity model enables cross-study analysis that was previously a 3-month custom project",
+          "Literature RAG reduces target validation literature review from weeks to days",
+          "SQL-accessible omics analytics eliminates HPC queue bottleneck for analytical workloads",
+          "Unity Catalog project-level access enforces IP protection at the engine level"
+        ],
+        "tradeoffs": [
+          "Research Entity model design requires significant domain expertise from computational biologists",
+          "Literature copyright compliance adds complexity to ingestion architecture",
+          "Omics data volumes (200TB+) require careful storage cost management"
+        ],
+        "idealMaturityLevel": "Advanced",
+        "platformMapping": [
+          "Auto Loader → lab assay files, omics HPC outputs, clinical datasets, RWD files",
+          "DLT → literature ingestion, embedding pipeline, knowledge base update",
+          "Silver Research Entities → InChI/UniProt-resolved compound, target, biomarker entities",
+          "Databricks Vector Search → literature knowledge base for RAG",
+          "Databricks AI Gateway → AI Research Assistant with citation-backed answers"
+        ],
+        "components": [
+          { "layer": "Ingestion", "items": ["Auto Loader (lab files, omics tables, clinical, RWD)", "DLT (literature pipeline)", "HPC-to-cloud omics transfer"] },
+          { "layer": "Silver", "items": ["Compound entity (InChI, activity profile)", "Target entity (UniProt, omics evidence)", "Biomarker entity (assay, clinical validation)", "Patient cohort (RWD)"] },
+          { "layer": "Gold", "items": ["Compound-target activity matrix", "Omics feature correlation matrix", "Target validation evidence summary", "Pipeline opportunity scores"] },
+          { "layer": "Knowledge", "items": ["Literature Knowledge Base (Vector Search)", "Embedding pipeline (BioMedBERT)", "Citation metadata store"] },
+          { "layer": "AI", "items": ["AI Research Assistant (RAG)", "AI Gateway (governed LLM access)", "Literature quality scoring"] }
+        ],
+        "talkTrack": [
+          "The Research Entity model is the scientific lingua franca of the platform — InChI key and UniProt ID are the Rosetta Stone that lets lab assay data talk to omics data talk to clinical data for the first time.",
+          "The Literature Knowledge Base isn't just search — it's AI synthesis. A researcher asks 'what is the genetic evidence for Target X in Disease Y?' and the assistant reads 50 papers, synthesizes the evidence, and returns an answer with citations in 10 seconds. That's 3 weeks of literature review compressed to 10 seconds.",
+          "Unity Catalog's project-level access controls mean a scientist on Drug A's team literally cannot query Drug B's data — the IP protection is enforced by the database engine, not by a policy memo."
+        ]
+      }
+    ],
+    "mockInterview": [],
+    "customerQuestions": [
+      {
+        "question": "Can we use this platform to train AI models on our proprietary research data without exposing IP to external AI providers?",
+        "bestAnswer": "Yes — the architecture is designed exactly for this. Databricks AI Gateway mediates all LLM API calls and can route inference to internally deployed models rather than external APIs. For model fine-tuning on proprietary data, Databricks Model Training lets you fine-tune foundation models using your internal data on your own compute — the data never leaves your environment. The RAG approach for the AI Research Assistant is particularly IP-safe because your proprietary data is retrieved and presented in context rather than used to train a model that could be interrogated for IP.",
+        "notes": "IP protection around AI training is a top concern for pharma companies. The RAG architecture and internal model serving are the key talking points. Distinguish between training (data used to modify model weights) and RAG (data used as context for a specific query).",
+        "weakAnswer": null,
+        "strongAnswer": null
+      },
+      {
+        "question": "How do we handle the fact that scientific literature has copyright restrictions?",
+        "bestAnswer": "We design the knowledge base to store vector embeddings of literature chunks rather than full text. Embeddings are numerical representations that encode semantic meaning but cannot be reverse-engineered into the original text — they are broadly considered outside the scope of copyright protection (subject to your legal team's review). For RAG retrieval, we return the relevant chunk for context within the LLM's context window but do not store or serve full-text copies. Full-text access for PubMed Central open-access articles is unrestricted. For licensed journal content, we work within your institutional license terms for text mining. We recommend engaging IP counsel to review the specific architecture before implementation.",
+        "notes": "This is a genuinely complex legal question. Acknowledge the complexity, explain the technical architecture (embeddings vs. full text), and recommend IP counsel review. Don't overstate certainty on copyright law.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      }
+    ],
+    "risks": [
+      {
+        "title": "Research Entity Model Design Complexity",
+        "description": "Designing canonical Research Entities that are flexible enough to support diverse research data types while consistent enough to enable cross-study analytics requires deep domain expertise. A poorly designed entity model will be rejected by scientists or will fail to integrate data meaningfully.",
+        "likelihood": "High",
+        "impact": "High",
+        "mitigation": "Recruit 3-5 senior computational scientists as co-designers for the entity model. Use an iterative design approach: pilot with one therapeutic area and one data type (compounds) before expanding. Validate that the entity model answers the most common research questions before moving to production. The entity model is the platform's scientific foundation — invest in getting it right before optimizing the data engineering."
+      },
+      {
+        "title": "Scientist Adoption of AI Research Assistant",
+        "description": "Research scientists with PhDs may have high expectations for AI accuracy and will distrust answers that contain errors. A single high-profile wrong answer can undermine adoption across the research community.",
+        "likelihood": "Medium",
+        "impact": "High",
+        "mitigation": "Set clear expectations: the AI Research Assistant is a research productivity tool, not a research oracle. It should be used for initial evidence gathering and hypothesis generation, with expert review before conclusions are drawn. Design the citation trail prominently so scientists can verify every AI statement. Pilot with the most AI-open scientists first, build a library of example queries where the assistant excels, and address failure modes transparently."
+      },
+      {
+        "title": "Omics Data Transfer Cost and Latency",
+        "description": "Moving 200TB+ of omics data from HPC to cloud object storage is a significant one-time data transfer with ongoing incremental transfer requirements. Transfer costs and latency may be underestimated.",
+        "likelihood": "Medium",
+        "impact": "Medium",
+        "mitigation": "Focus initial omics integration on processed summary tables (VCF callsets, expression matrices) rather than raw FASTQ files — these are 100-1000x smaller and contain the data needed for analytics. Establish a recurring incremental transfer process for new HPC outputs. Use a high-bandwidth transfer service (AWS DataSync, Azure Data Box for the initial bulk transfer) with ongoing incremental sync using cloud storage gateway."
+      }
+    ],
+    "deliverables": [
+      {
+        "name": "R&D Knowledge Platform Architecture Blueprint",
+        "purpose": "Comprehensive technical design for the Research Entity Lakehouse including data source integration, Research Entity model, Literature Knowledge Base architecture, AI Research Assistant design, and IP governance model.",
+        "outline": [
+          "Executive summary and research productivity ROI model",
+          "Research data landscape assessment (sources, volumes, formats, IP sensitivity)",
+          "Research Entity model design (Compound, Target, Biomarker, Patient Cohort)",
+          "Ingestion architecture (lab files, omics, clinical, literature, RWD)",
+          "Literature Knowledge Base design (chunking, embedding, Vector Search, copyright compliance)",
+          "AI Research Assistant architecture (RAG, citation trail, quality monitoring)",
+          "Unity Catalog IP governance model (project-level access, DUA compliance)",
+          "Omics data transfer strategy and storage cost model",
+          "Deployment roadmap and therapeutic area pilot plan"
+        ]
+      }
+    ],
+    "executiveSummary": {
+      "sponsorReady": "We are building a unified R&D Knowledge Platform on Databricks that integrates all your research data sources — lab experiments, omics, clinical studies, scientific literature, and real-world evidence — into a queryable Research Entity model and an AI Research Assistant that answers target validation questions with evidence-backed citations. This platform will reduce target validation timeline from 4 weeks to 1 week, eliminate HPC queue bottlenecks for omics analytics, and make your proprietary scientific knowledge the foundation for AI-powered drug discovery.",
+      "thirtySecond": "Your research data is in shared drives, HPC clusters, and spreadsheets — your scientists spend half their time finding data instead of doing science. The Databricks R&D Knowledge Platform integrates all of it into a unified Research Entity model and adds an AI Research Assistant that synthesizes target validation evidence from your proprietary data and 2 million+ scientific papers in seconds.",
+      "twoMinute": "Right now, answering the question 'what is the evidence for Target X in Disease Y?' requires a scientist to check the assay database, request omics data from bioinformatics, query the clinical data warehouse, search PubMed manually, and compile a summary in PowerPoint — a 3-4 week process. Meanwhile, your competitor might have the same data and a platform that answers it in an afternoon. The R&D Knowledge Platform changes this. Lab assay results, omics expression data from HPC, clinical biomarker data, and 2 million+ scientific papers are all integrated into a Research Entity model with canonical compound and target identifiers. The AI Research Assistant synthesizes evidence across all of these sources in response to a natural language question, returning an answer with full citations in under 30 seconds. Your computational scientists can run omics correlation analyses using SQL rather than waiting 3 weeks in the HPC queue. Unity Catalog enforces project-level IP access controls so pre-patent research data is isolated by program. This is the intelligence infrastructure that accelerates your drug discovery pipeline by connecting your proprietary experimental knowledge with the world's scientific literature.",
+      "successIn12Months": [
+        "Research Entity model covering 200+ compounds with integrated assay, omics, and clinical evidence",
+        "AI Research Assistant achieving 80%+ scientist satisfaction in pilot evaluation",
+        "HPC queue analytical bottleneck eliminated for SQL-based omics queries",
+        "Literature Knowledge Base covering 2M+ PubMed Central articles with weekly update",
+        "Target validation evidence summary time reduced from 4 weeks to 1 week"
+      ]
+    },
+    "meetingChecklist": [
+      "Research the company's pipeline and identify 2-3 programs where cross-study analytics would have immediate value",
+      "Prepare an AI Research Assistant demo using PubMed Central data on a target in the customer's therapeutic area",
+      "Have the omics data scale analysis ready: volume estimate, storage cost comparison HPC vs Delta Lake",
+      "Prepare the Unity Catalog project-level IP governance architecture diagram",
+      "Know the customer's current literature review process and manual effort per target validation package",
+      "Identify the computational biology champions — the key researchers whose endorsement drives adoption"
+    ],
+    "nextSteps": [
+      "Schedule a research data landscape workshop with computational science and bioinformatics leads",
+      "Request sample assay data for one therapeutic area's compound library for POC compound entity build",
+      "Pilot the AI Research Assistant with 5 computational scientists using PubMed Central data",
+      "Engage IP counsel on cloud storage of pre-patent research data and literature embedding copyright questions",
+      "Deliver a 14-week POC proposal covering one therapeutic area's Research Entity build and AI assistant pilot"
+    ],
+    "whiteboardTalkTrack": [
+      "Draw the current state: lab drives, HPC cluster, clinical data warehouse, PubMed on the browser — all disconnected from each other",
+      "Show the scientist's question: 'What is the evidence for Target X?' — then draw the 4-week manual process to answer it",
+      "Draw the Research Entity model: Compound, Target, Biomarker in Silver — connected by InChI and UniProt identifiers",
+      "Show the data flowing in from all sources: assay files → compound activity, omics tables → target expression, clinical data → biomarker validation, literature → evidence synthesis",
+      "Show the AI Research Assistant: scientist types the question, RAG retrieves from Literature KB + Gold layer, AI synthesizes and cites, answer in 30 seconds",
+      "Show Unity Catalog: project-level locks enforcing IP protection, DUA compliance tags on external data",
+      "Close with the compound knowledge: 'You own the world's most valuable data about your compounds and targets. Today it's locked in shared drives. This platform makes it the foundation of your AI discovery strategy.'"
+    ],
+    "workshopPlan": [
+      "Morning Session 1 (90 min): Research data landscape — map all data sources, formats, volumes, and access constraints for lab, omics, clinical, literature, and RWD",
+      "Morning Session 2 (60 min): Research Entity model design — what are the key entities (Compound, Target, Biomarker), what identifier schemes, and what data elements are essential?",
+      "Afternoon Session 1 (90 min): AI Research Assistant requirements — what research questions must it answer? What accuracy and citation requirements? What failure modes are unacceptable?",
+      "Afternoon Session 2 (60 min): IP governance — project-level access control requirements, DUA compliance requirements, literature copyright approach",
+      "Wrap-up (30 min): Therapeutic area pilot selection, computational science champions, and POC timeline"
+    ],
+    "objections": [
+      {
+        "objection": "We can't put our pre-patent compound data in the cloud. The IP risk is too high.",
+        "response": "This concern is understandable and important. The architecture addresses it at multiple layers: Databricks workspace is deployed in your private VPC with no public egress, Unity Catalog project-level access controls restrict compound data to authorized program team members, and all data access is logged. Many top pharma and biotech companies store pre-patent research data in cloud lakehouses under these controls — we can share reference architectures from companies that have gone through this review with their IP counsel. We recommend a specific IP risk assessment with your IP and security teams using the reference architecture."
+      },
+      {
+        "objection": "Our scientists are skeptical of AI. They don't trust AI-generated summaries for scientific decisions.",
+        "response": "This skepticism is healthy and scientifically appropriate. The AI Research Assistant is designed for skeptics: every answer includes citations to the specific papers and data points used, so a scientist can immediately verify the AI's claim by reading the source. The assistant is positioned as a research accelerator — it does the initial evidence gathering and synthesis, and the scientist's expertise provides the critical evaluation. We start with use cases where the AI can be verified easily (compound activity queries against the known compound library) and build trust before moving to more complex hypothesis-generation queries."
+      }
+    ]
+  }
+}

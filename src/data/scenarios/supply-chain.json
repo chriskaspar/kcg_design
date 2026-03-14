@@ -1,0 +1,522 @@
+{
+  "id": "supply-chain-static",
+  "title": "Global Supply Chain & Manufacturing Intelligence Platform",
+  "updatedAt": "2026-03-14T00:00:00.000Z",
+  "input": {
+    "scenarioTitle": "Global Supply Chain & Manufacturing Intelligence Platform",
+    "industry": "Manufacturing",
+    "customerType": "Enterprise",
+    "problemStatement": "A global manufacturing enterprise cannot achieve intelligent supply chain operations because manufacturing, quality, logistics, supplier, and ERP data exist in completely separate systems across 40 plants and 80 countries, preventing demand forecasting, production optimization, predictive maintenance, and end-to-end supply chain visibility.",
+    "businessGoals": "Unify manufacturing execution, quality management, logistics, supplier performance, and ERP financial data into an intelligent operational platform that enables real-time production visibility, AI-powered demand forecasting, predictive maintenance, and supply chain risk intelligence across the global network.",
+    "constraints": "40+ manufacturing plants across 80 countries with different ERP instances, IoT sensor data from 50,000+ machines with varying connectivity, just-in-time production schedules where data latency directly costs money, and stringent data sovereignty requirements in some regions.",
+    "timeline": "12 months for unified operational visibility, 18 months for AI forecasting and predictive maintenance",
+    "currentState": "Each plant uses a local MES (Manufacturing Execution System), SAP is deployed in 3 separate instances by region, quality data is in a separate QMS, logistics data is in a TMS (Transportation Management System), and supplier data is exchanged via EDI with no integration to the analytics layer.",
+    "desiredFutureState": "A unified Databricks Lakehouse with a global Operational Entity model enabling real-time production performance monitoring, AI-powered demand forecasting, predictive maintenance for critical equipment, supplier risk scoring, and inventory optimization across the global supply chain network.",
+    "stakeholders": "Chief Supply Chain Officer, VP of Manufacturing Operations, VP of Quality, Chief Procurement Officer, CIO, VP of Logistics",
+    "compliance": ["ISO 9001/AS9100 (Aerospace Quality)", "IATF 16949 (Automotive Quality)", "REACH/RoHS (Chemical Compliance)", "Data Sovereignty Regulations"],
+    "architecturePreference": "Medallion (Bronze/Silver/Gold) on Databricks Lakehouse",
+    "outputDepth": "Comprehensive"
+  },
+  "architecture": {
+    "title": "Global Supply Chain & Manufacturing Intelligence Platform Architecture",
+    "summary": "A Databricks Lakehouse unifying manufacturing, quality, logistics, supplier, and ERP data from 40 plants across 80 countries into an Operational Entity model that powers real-time production intelligence, AI demand forecasting, predictive maintenance, and supply chain risk management.",
+    "solutionOverview": "Manufacturing data from plant MES systems, quality management, logistics (TMS), supplier EDI, and ERP financial systems flows into the Databricks Lakehouse via Auto Loader for batch ingestion and Delta Live Tables for real-time IoT sensor streams and production event data. The Bronze layer preserves raw operational data from all 40 plants with plant-level data provenance and audit history. The Silver layer builds Operational Entities — Plants, Equipment, Work Orders, Materials, Suppliers, Shipments — unified across all facilities using common part numbers, supplier codes, and plant identifiers. The Gold layer materializes supply chain intelligence products: production efficiency KPIs, quality defect trend analysis, supplier scorecards, demand forecasts, inventory optimization recommendations, and predictive maintenance risk scores. Unity Catalog governs access with plant-level and business-unit-level access controls.",
+    "assumptions": [
+      "MES systems provide OPC-UA or REST API access for production event data and machine telemetry",
+      "SAP S/4HANA or ECC provides batch extract capability via RFC or OData APIs for financial and material master data",
+      "Supplier EDI data (X12 or EDIFACT) is available from the EDI integration layer",
+      "IoT sensors on critical manufacturing equipment can be connected via an industrial IoT gateway",
+      "Data sovereignty requirements in specific regions can be met with Databricks multi-region deployment"
+    ],
+    "details": [
+      {
+        "title": "Operational Data Sources",
+        "body": "Five primary source domains: Manufacturing Systems (MES production events, work order completions, downtime records, OEE data from all 40 plants); Quality Systems (in-process quality checks, final inspection results, non-conformance records, corrective actions, supplier quality data); Logistics (TMS shipment tracking, carrier performance, customs clearance, warehouse management data); Supplier Data (EDI purchase orders, advance ship notices, supplier invoices, supplier quality certifications); and ERP/Finance (SAP material master, inventory levels, cost data, demand forecasts, and financial performance by plant and product)."
+      },
+      {
+        "title": "Operational Entity Model",
+        "body": "The Silver layer builds canonical Operational Entities: Equipment (equipment ID, plant, line, model, age, maintenance history, current OEE, sensor telemetry); Work Order (work order ID, product, plant, scheduled/actual start/end, quantity, quality results, material consumption); Material (material number, description, current inventory by location, demand forecast, supplier lead time, safety stock level); Supplier (supplier ID, performance score, on-time delivery rate, quality rejection rate, risk flags, financial stability indicators); and Shipment (shipment ID, origin, destination, carrier, status, ETD/ETA, exceptions)."
+      },
+      {
+        "title": "Demand Forecasting and Inventory Optimization",
+        "body": "The Gold layer AI layer includes a demand forecasting model using historical sales orders, seasonal patterns, market indicators, and ERP demand signals to generate 13-week forward demand forecasts by product and region. Inventory optimization uses the demand forecast with supplier lead times and safety stock parameters to recommend optimal inventory levels at each stocking location, minimizing working capital while maintaining service levels."
+      },
+      {
+        "title": "Predictive Maintenance",
+        "body": "The predictive maintenance AI uses IoT sensor time-series data (vibration, temperature, pressure, electrical current) from critical manufacturing equipment to predict failure probabilities. Models are trained per equipment type using historical failure events and maintenance records. High-risk equipment generates maintenance recommendations integrated with the plant's CMMS (Computerized Maintenance Management System) for work order creation."
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-mfg",
+        "label": "Manufacturing Systems",
+        "iconId": "source-manufacturing",
+        "vendor": "generic",
+        "notes": "MES production events, work order completions, machine downtime, and OEE data from 40 plants globally via OPC-UA and REST API integration",
+        "x": 60,
+        "y": 80,
+        "metadata": { "group": "Operational Sources" }
+      },
+      {
+        "id": "n-quality",
+        "label": "Quality Systems",
+        "iconId": "source-quality-systems",
+        "vendor": "generic",
+        "notes": "In-process and final inspection results, non-conformance records, CAPA investigations, and supplier quality data from the QMS across all facilities",
+        "x": 60,
+        "y": 200,
+        "metadata": { "group": "Operational Sources" }
+      },
+      {
+        "id": "n-logistics",
+        "label": "Logistics",
+        "iconId": "source-logistics",
+        "vendor": "generic",
+        "notes": "TMS shipment tracking, carrier performance, customs clearance events, warehouse management data, and freight cost data from the global logistics network",
+        "x": 60,
+        "y": 320,
+        "metadata": { "group": "Operational Sources" }
+      },
+      {
+        "id": "n-suppliers",
+        "label": "Supplier Data",
+        "iconId": "source-suppliers",
+        "vendor": "generic",
+        "notes": "EDI purchase orders, advance ship notices, supplier invoices, quality certificates, and supplier performance data from the procurement EDI integration layer",
+        "x": 60,
+        "y": 440,
+        "metadata": { "group": "Operational Sources" }
+      },
+      {
+        "id": "n-erp",
+        "label": "ERP / Finance",
+        "iconId": "source-erp",
+        "vendor": "generic",
+        "notes": "SAP material master, inventory levels, cost data, demand forecasts, customer orders, and financial performance data from 3 regional SAP instances",
+        "x": 60,
+        "y": 560,
+        "metadata": { "group": "Operational Sources" }
+      },
+      {
+        "id": "n-autoloader",
+        "label": "Auto Loader",
+        "iconId": "databricks-data-ingestion",
+        "vendor": "databricks",
+        "notes": "Batch ingestion for SAP RFC exports, MES batch files, quality data, EDI supplier data, and TMS exports with schema evolution across 40 plant data formats",
+        "x": 300,
+        "y": 200,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-dlt",
+        "label": "Delta Live Tables",
+        "iconId": "databricks-dlt",
+        "vendor": "databricks",
+        "notes": "Real-time DLT pipelines for IoT sensor streaming, production event streaming, logistics tracking events, and EDI transaction processing",
+        "x": 300,
+        "y": 420,
+        "metadata": { "group": "Ingestion" }
+      },
+      {
+        "id": "n-bronze",
+        "label": "Bronze Layer",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Raw operational data from all 40 plants with plant-level provenance, source system audit history, and full data lineage across manufacturing and supply chain sources",
+        "x": 560,
+        "y": 300,
+        "metadata": { "group": "Bronze Layer" }
+      },
+      {
+        "id": "n-silver",
+        "label": "Silver Layer (Operational Entities)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Canonical Operational Entities: Equipment (with OEE and telemetry), Work Order, Material (with inventory and demand), Supplier (with performance scores), Shipment — unified across all plants",
+        "x": 760,
+        "y": 300,
+        "metadata": { "group": "Silver Layer" }
+      },
+      {
+        "id": "n-gold",
+        "label": "Gold Layer (Supply Chain Products)",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Production KPI dashboards, quality defect trends, supplier scorecards, demand forecasts, inventory optimization recommendations, and predictive maintenance risk scores",
+        "x": 960,
+        "y": 300,
+        "metadata": { "group": "Gold Layer" }
+      },
+      {
+        "id": "n-uc",
+        "label": "Unity Catalog",
+        "iconId": "databricks-governance",
+        "vendor": "databricks",
+        "notes": "Plant-level and business-unit access controls, data sovereignty region tagging, quality certification data lineage, supplier data governance, and compliance audit trails",
+        "x": 760,
+        "y": 560,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-sql",
+        "label": "SQL Warehouses",
+        "iconId": "databricks-sql-warehouses",
+        "vendor": "databricks",
+        "notes": "SQL Warehouses for plant operations teams, supply chain analysts, procurement, quality engineers, and executive reporting with role-based access by plant and function",
+        "x": 1160,
+        "y": 160,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-analytics",
+        "label": "Supply Chain Analytics",
+        "iconId": "databricks-dashboards",
+        "vendor": "databricks",
+        "notes": "Global production KPI dashboards, plant benchmarking, OEE trend analysis, quality scorecards, supplier performance, and inventory position dashboards",
+        "x": 1320,
+        "y": 200,
+        "metadata": { "group": "Analytics & AI" }
+      },
+      {
+        "id": "n-ai",
+        "label": "Predictive Maintenance AI",
+        "iconId": "databricks-models",
+        "vendor": "databricks",
+        "notes": "MLflow-managed equipment health scoring, demand forecasting, inventory optimization, and supplier risk models integrated with CMMS and ERP for operational action",
+        "x": 1240,
+        "y": 420,
+        "metadata": { "group": "Analytics & AI" }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n-mfg", "target": "n-autoloader", "label": "MES batch production data", "protocol": "OPC-UA/REST" },
+      { "id": "e2", "source": "n-quality", "target": "n-autoloader", "label": "QMS batch export", "protocol": "API/File" },
+      { "id": "e3", "source": "n-logistics", "target": "n-dlt", "label": "TMS tracking events stream", "protocol": "API/EDI" },
+      { "id": "e4", "source": "n-suppliers", "target": "n-dlt", "label": "EDI transaction stream", "protocol": "EDI/API" },
+      { "id": "e5", "source": "n-erp", "target": "n-autoloader", "label": "SAP batch extract", "protocol": "RFC/OData" },
+      { "id": "e6", "source": "n-autoloader", "target": "n-bronze", "label": "Plant-tagged Delta write", "protocol": "Delta" },
+      { "id": "e7", "source": "n-dlt", "target": "n-bronze", "label": "Streaming Delta write", "protocol": "Delta" },
+      { "id": "e8", "source": "n-bronze", "target": "n-silver", "label": "Operational entity resolution", "protocol": "Spark" },
+      { "id": "e9", "source": "n-silver", "target": "n-gold", "label": "Supply chain intelligence aggregation", "protocol": "Spark" },
+      { "id": "e10", "source": "n-silver", "target": "n-uc", "label": "Plant governance registration", "protocol": "Unity Catalog" },
+      { "id": "e11", "source": "n-gold", "target": "n-uc", "label": "Supply chain product registration", "protocol": "Unity Catalog" },
+      { "id": "e12", "source": "n-gold", "target": "n-sql", "label": "SQL query access", "protocol": "SQL" },
+      { "id": "e13", "source": "n-sql", "target": "n-analytics", "label": "Dashboard queries", "protocol": "SQL" },
+      { "id": "e14", "source": "n-gold", "target": "n-ai", "label": "Operational features", "protocol": "MLflow" },
+      { "id": "e15", "source": "n-uc", "target": "n-ai", "label": "Governed plant data access", "protocol": "Unity Catalog" }
+    ],
+    "refinements": [
+      "Add real-time supply chain disruption detection using supplier financial data, geopolitical risk indices, and logistics delay patterns to score supply chain risk proactively",
+      "Build an end-to-end product genealogy capability tracing every component from supplier lot through production to customer shipment for quality recall management",
+      "Implement energy consumption analytics by equipment and plant to identify optimization opportunities and support ESG/sustainability reporting",
+      "Add a digital twin layer for each manufacturing line that simulates production scheduling scenarios before committing production plans",
+      "Build a supplier development recommendation system that identifies which suppliers need capability investment based on performance trend analysis"
+    ]
+  },
+  "architectAnswers": {
+    "why_w1": "The global manufacturing network operates 40 plants across 80 countries, each with a local MES and quality system. When a customer calls about a quality issue, tracing the problem back to the production lot, the supplier component, and the process parameters takes 3-5 days of manual data gathering across multiple systems. An end-to-end production genealogy capability in the Operational Entity model would reduce this to hours, protecting customer relationships and potentially avoiding recalls.",
+    "why_w2": "Demand forecasting is currently performed by regional S&OP teams using Excel with data manually extracted from 3 SAP instances. The forecasts are inconsistent across regions, leading to simultaneous inventory excess in some regions and stockouts in others. AI-powered demand forecasting using unified global sales history and market signals would improve forecast accuracy by 15-25% based on industry benchmarks — directly reducing working capital and improving service levels.",
+    "why_w3": "Predictive maintenance is the highest-ROI AI use case: unplanned equipment downtime costs the company an estimated $80M annually across all plants (including overtime labor, scrapped materials, and delayed shipments). Industry data shows that predictive maintenance programs can reduce unplanned downtime by 20-40%. Even a 10% reduction — $8M in avoided downtime costs — exceeds the platform investment in the first year.",
+    "why_h1": "The Chief Procurement Officer cannot see supplier performance across all plants in real time. When a supplier has quality rejections at Plant A and delivery delays at Plant B simultaneously, the CPO doesn't know until each plant's purchasing manager reports it separately. A unified Supplier Operational Entity with real-time performance scoring enables proactive supplier management and earlier risk escalation.",
+    "why_h2": "OEE (Overall Equipment Effectiveness) measurement is performed manually at each plant using data from the local MES. Comparing OEE across plants requires waiting for monthly reports from each plant manager. The resulting analysis is 30 days old before it reaches the VP of Manufacturing. A unified OEE dashboard with real-time data from all 40 plants enables cross-plant benchmarking and best-practice sharing that drives continuous improvement.",
+    "why_h3": "Just-in-time manufacturing means that supply chain disruptions have near-immediate cost consequences. A component shortage discovered on Monday can stop a production line by Wednesday. The current information flow — supplier doesn't deliver → production scheduler notices on delivery day → escalation to procurement → supplier expedited — takes 2-3 days before action is taken. Real-time supplier ASN tracking and inventory position monitoring via the Silver layer enables 5-7 day advance warning of supply disruptions.",
+    "goal_g1": "The primary goal is a unified Operational Entity model in Silver covering all 40 plants — Equipment (with OEE and telemetry), Work Orders, Materials (with inventory), and Suppliers (with performance scores) — enabling cross-plant production analytics, supplier performance comparison, and global inventory visibility within 6 months of platform launch.",
+    "goal_g2": "The demand forecasting model must achieve a MAPE (Mean Absolute Percentage Error) of under 12% at the SKU-week level across all regions, compared to the current manual forecast MAPE of 22%. This improvement directly translates to $15M+ in reduced safety stock and $8M+ in reduced stockout-driven premium freight costs annually.",
+    "goal_o1": "Production operations success: plant operations teams access a real-time production dashboard showing current OEE by line, in-process quality defect rate, and work-in-process status without waiting for the next shift report. Machine operators can see predicted production completion times and proactively alert maintenance before a predicted equipment issue causes a line stoppage.",
+    "goal_o2": "Supply chain operations success: the S&OP team accesses a weekly demand forecast from the AI model within 2 hours of the new forecast run (vs the current 2-day manual process), with variance explanations identifying the drivers of forecast changes — allowing faster response to demand signals than any competitor using manual forecasting.",
+    "goal_a1": "The platform must handle IoT sensor data from 50,000+ machines × 20 parameters × 1 reading/minute = 1 billion sensor readings per day at peak. DLT Structured Streaming with Dynamic Allocation auto-scales to handle peak production hours. Bronze sensor data must be available for predictive maintenance scoring within 5 minutes of sensor transmission.",
+    "goal_a2": "Global OEE dashboard must support 500+ concurrent users — plant managers, line supervisors, quality engineers, and executive viewers across 40 plants — with real-time data refreshing every 5 minutes during production hours. SQL Warehouses with photon acceleration and Delta Lake result caching deliver this performance without per-plant compute isolation.",
+    "goal_l1": "Plant-level data access controls: production staff at Plant A cannot access production data from Plant B. Regional VPs see all plants in their region. Corporate functions (quality, procurement, finance) see all plants globally for their domain data. Unity Catalog row-level security enforces these access controls with plant_id and region_id as security predicates.",
+    "goal_l2": "Data sovereignty: some countries (China, Russia, certain EU states) have data localization requirements restricting manufacturing data from leaving the country. A multi-region Databricks deployment assigns plants to regional workspaces. Aggregated, non-personal analytics data is permitted to flow to the global workspace. Plant-level detailed production data stays in the regional workspace.",
+    "safe_s1": "ISO 9001/IATF 16949 quality records must have tamper-evident audit trails. The Bronze layer serves as the immutable quality data archive — once quality inspection records are written, they cannot be modified without creating an explicit correction record. Unity Catalog audit logs track all access to quality records for third-party auditor review during quality management system audits.",
+    "safe_s2": "REACH/RoHS chemical compliance data (material composition declarations, substance restriction compliance) is governed in Unity Catalog with chemical substance classification. Non-compliant materials flagged in the QMS are automatically tagged in the Material Operational Entity, preventing their use in new production orders for restricted markets through a compliance check integration with the ERP system.",
+    "safe_a1": "IoT sensor data integrity is validated at ingestion: each sensor transmission includes a plant and equipment identifier that is validated against the Equipment Registry in Unity Catalog. Sensor readings outside the physical operating range (temperatures above furnace maximum, pressures above equipment specification) are flagged as potential sensor malfunctions rather than processed as real data. Sensor data gaps exceeding 10 minutes trigger an equipment connectivity alert.",
+    "safe_a2": "Production data from the MES is the system of record for production quantities, quality results, and work order completions. The lakehouse receives a copy for analytics — it does not write back to the MES and does not affect production operations. In the event of a lakehouse failure, production operations continue unaffected. This read-only integration design ensures the platform adds intelligence without adding operational risk.",
+    "safe_f1": "SAP data extraction reliability: SAP RFC extracts can be affected by SAP system patches, table structure changes, and ABAP customizations at individual plants. A data extraction monitoring layer validates SAP extract record counts against expected volumes and triggers alerts when extracts are below threshold. Delta Lake time travel enables replaying SAP extracts if a quality issue is discovered after the initial load.",
+    "safe_e1": "Supply chain analytics platform RTO: 2 hours (production operations require analytics availability, but can tolerate short outages). RPO: 1 hour. Delta Lake transaction logs are replicated cross-region. For plants in data sovereignty regions, the regional workspace has its own backup and recovery independent of the global workspace.",
+    "safe_e2": "Predictive maintenance model failures must not block production operations. The maintenance recommendation is advisory — if the model serving endpoint fails, the plant continues operating normally without AI recommendations. Failure of the model triggers an alert to the AI engineering team and a notification to plant maintenance managers to increase manual inspection frequency of high-risk equipment during the outage.",
+    "flow_f1": "Data flows: MES production events (real-time or hourly batch) → Auto Loader/DLT → Bronze → Operational Entity Silver update (Equipment OEE, Work Order status) → Gold production KPI refresh → dashboard. SAP data (nightly batch) → Auto Loader → Bronze → Material and Supplier entity update → Gold inventory position and demand forecast refresh. IoT telemetry (continuous) → DLT streaming → Bronze → predictive maintenance feature computation → Gold risk scores → CMMS integration.",
+    "flow_l1": "The IoT telemetry pipeline is the highest-volume and most latency-sensitive production flow. 1 billion sensor readings per day require DLT Dynamic Allocation scaling from 50 to 500 workers during peak production shifts (6 AM - 10 PM local time across all time zones). Bronze telemetry data is partitioned by plant and equipment_id with Z-ordering on timestamp for efficient predictive maintenance feature queries.",
+    "flow_o1": "Quality data quality validation: in-process quality check results are validated against specification limits loaded from the ERP material master. Parts with measurements outside control limits are automatically flagged in the Work Order Operational Entity with a quality hold status. Non-conformances are routed to the QMS for CAPA investigation. The Gold quality metrics layer tracks first-pass yield, defect rates, and customer complaint rates by plant, product, and production lot.",
+    "flow_w1": "Databricks Workflows orchestrates: continuous IoT streaming (24/7); hourly MES production event ingestion; nightly SAP batch extract (results available by 5 AM each region's business day); weekly demand forecast model run (results published to ERP for S&OP review); daily supplier performance score update; and monthly equipment health model retraining. SLA monitoring alerts the data engineering team when any job exceeds its SLA window.",
+    "data_d1": "Core Operational Entity data domains: Equipment (equipment ID, plant, production line, equipment type, OEM model, installation date, current OEE breakdown (availability, performance, quality), maintenance history, current health score, IoT sensor configuration); Work Order (work order ID, material number, plant, production line, scheduled quantity, completed quantity, scrap quantity, production start/end, in-process quality results, material consumption); Material (material number, description, unit of measure, material type, current stock by plant/storage location, safety stock, reorder point, supplier lead time, demand forecast); Supplier (supplier ID, name, country, material scope, on-time delivery rate, quality rejection rate, lead time reliability, financial risk score, sustainability score).",
+    "data_d2": "IoT telemetry time-series data schema: each sensor reading record contains equipment_id, plant_id, sensor_tag (unique identifier for the measurement point on the equipment), reading_timestamp (UTC), sensor_value (numeric), sensor_unit, quality_flag (good/uncertain/bad), and transmission_timestamp. This normalized schema supports efficient feature engineering using rolling window aggregations (mean, std, min, max over 1h/4h/24h windows) for the predictive maintenance model. Sensor configuration metadata (normal operating range, alarm limits, calibration date) is stored in the Equipment Registry in Unity Catalog.",
+    "data_a1": "Multi-plant data harmonization is the most complex data challenge: 40 plants using different MES vendors, different work order numbering schemes, different part number formats, and different quality measurement units. The Silver layer applies a harmonization mapping layer that translates plant-local identifiers to global canonical identifiers using mapping tables loaded from the ERP material master and a global equipment registry. New plants are onboarded by configuring their local-to-global identifier mapping — a 2-4 week process per plant.",
+    "data_a2": "SAP multi-instance complexity: 3 regional SAP instances (Americas, EMEA, APAC) use different customizations, different material number formats (some have leading zeros, some don't), and different units of measure conventions. The Silver material entity standardizes all three instances to a canonical global material number format and ISO unit of measure codes. Cross-instance inventory visibility requires joining the three instances' material stock tables through this canonical model.",
+    "data_t1": "The Equipment Operational Entity uses an ISO 14224 compliant equipment taxonomy for equipment classification and failure mode coding. This standard taxonomy enables cross-plant predictive maintenance model sharing — a vibration anomaly model trained on gearboxes at Plant A can be applied to the same gearbox model at Plant B using the same feature engineering and model scoring logic. Without a standardized taxonomy, each plant's equipment would require a separate model.",
+    "data_t2": "The Gold demand forecast uses an ensemble approach: statistical time-series models (Prophet, SARIMA) for stable SKUs with long history; machine learning models (LightGBM) for SKUs with promotional patterns or market-driven demand signals; and a consensus layer that combines model outputs with S&OP team adjustments. All three model outputs are stored in the Gold forecast table with confidence intervals and model attribution for transparency in the S&OP review process.",
+    "data_a3": "Manufacturing data retention for quality traceability: ISO 9001 requires retention of quality records for a minimum of the product's useful life, which for industrial products can be 10-30 years. The Bronze layer archives all production quality records indefinitely. Active production analytics use data from the past 3 years in Silver and Gold. Older data is queryable from Bronze for specific traceability requests (e.g., a field failure requiring production record reconstruction from 8 years ago).",
+    "data_a4": "Product genealogy lineage for recall management: Unity Catalog lineage tracks the path from supplier lot → incoming inspection → material consumption in work order → production lot → finished goods → customer shipment. When a quality issue requires a recall assessment, this lineage enables rapid identification of all affected customer shipments containing material from the suspect supplier lot — reducing recall scope determination from weeks to hours.",
+    "fast_f1": "The fastest path to value is a global OEE dashboard showing real-time Overall Equipment Effectiveness by plant and production line. Even with only MES data (the most accessible source), a cross-plant OEE comparison reveals performance gaps between similar facilities that immediately identify improvement opportunities. Plants in the bottom quartile can study practices at top-quartile plants — a lean manufacturing capability that previously required expensive consulting engagements.",
+    "fast_f2": "A supplier on-time delivery scorecard using EDI ASN data versus purchase order due dates can be built in 6-8 weeks and immediately provides procurement with a weekly supplier performance view that currently requires manual calculation by 20 regional procurement analysts. This quick win directly enables the CPO to make data-driven supplier consolidation decisions.",
+    "fast_a1": "The 16-week rapid deployment plan: Weeks 1-4 cover infrastructure, Unity Catalog plant access model, and Auto Loader for the top 3 MES systems (covering 60% of plants). Weeks 5-8 add SAP batch extraction for materials and inventory, and Silver Operational Entity build. Weeks 9-12 deliver the OEE dashboard and supplier scorecard Gold products. Weeks 13-16 add IoT telemetry streaming for the first predictive maintenance pilot plant.",
+    "fast_a2": "Start with a regional pilot (e.g., the 8 North American plants) before scaling to all 40 globally. North American plants likely share the same MES vendor and have better data quality than plants in emerging markets. Proving the architecture on 8 plants creates a template and lessons learned for the global rollout — and demonstrates ROI before full investment.",
+    "fast_s1": "90-day quick wins: (1) Global OEE dashboard with data from all North American plants; (2) Supplier on-time delivery scorecard for top 50 suppliers; (3) Cross-plant inventory visibility showing global stock by material; (4) Quality defect trend dashboard by plant and product line. Each delivers immediate operational value visible to the CSCO and VP Manufacturing.",
+    "fast_t1": "SAP connectors for Databricks (Databricks native SAP connector, or third-party connectors from Boomi, Fivetran) accelerate ERP integration without custom ABAP development. OPC-UA to Kafka bridges are available from industrial IoT vendors (Prosys, Inductive Automation) for connecting plant MES systems to the Databricks streaming pipeline without custom integration code.",
+    "fast_t2": "Databricks AutoML can train a baseline demand forecast model using 24 months of SAP sales order history in 2-4 hours. This baseline model immediately demonstrates forecast improvement over manual Excel-based forecasting and gives the S&OP team a foundation for evaluating the AI forecasting approach before committing to a full production model development effort.",
+    "run_r1": "Global platform operations: 6 data engineers (2 per region) manage ingestion pipelines and Operational Entity maintenance; 3 data scientists manage demand forecasting, predictive maintenance, and supplier risk models; 2 platform administrators manage Unity Catalog governance and regional workspace configuration; 1 supply chain SME ensures Gold layer products meet business requirements. Plant-level data engineering support is provided by regional data engineering teams embedded in manufacturing operations.",
+    "run_r2": "IoT data economics at scale: 1 billion sensor readings per day × 365 days = 365 billion records annually. Delta Lake Z-ordering, data skipping, and column-level statistics reduce query cost by 80%+ for targeted equipment and time-range queries. Sensor data older than 90 days is moved to cold storage tier (90% cost reduction) with query capability maintained. Predictive maintenance models use only the most recent 90 days of sensor data for feature engineering, making cold storage appropriate for historical analysis.",
+    "run_u1": "The demand forecasting model is retrained weekly using the most recent 24 months of sales history. Model performance is tracked by SKU and region with automatic alerting if MAPE exceeds 15% for any significant revenue SKU. When new products launch (with no sales history), a cold-start approach uses similar products' demand patterns as a baseline until 4 weeks of sales history are available. S&OP analysts can override AI forecast values in a consensus adjustment layer without modifying the underlying model.",
+    "run_u2": "Plant onboarding follows a standardized 8-week process: plant data landscape assessment → local-to-global identifier mapping configuration → MES data connection setup and validation → Bronze ingestion testing → Silver Operational Entity validation → plant-specific quality rules configuration → production go-live. Plants with unusual MES systems or data quality issues may require additional time. A plant onboarding checklist and runbook is maintained by the platform team.",
+    "run_n1": "Data sovereignty implementation: China, Russia, and other data-localized markets operate in dedicated regional Databricks workspaces within the country's permitted cloud region. Aggregated KPIs (OEE percentages, throughput rates — not individual product-level data) are permitted to flow to the global workspace for cross-plant analytics. Local plant operations teams use the regional workspace for detailed plant analytics. The global workspace hosts the demand forecasting model using aggregated data from all regions.",
+    "win_w1": "Platform success metrics at 18 months: (1) Global OEE dashboard live for all 40 plants with real-time data; (2) Demand forecast MAPE under 12% (from 22%); (3) Predictive maintenance pilot achieving 65%+ equipment failure prediction PPV with 20%+ unplanned downtime reduction; (4) Supplier scorecard covering 500+ suppliers with weekly performance updates; (5) Cross-plant inventory visibility enabling $30M+ working capital reduction.",
+    "win_i1": "5-year business case: $80M in avoided unplanned downtime (20% reduction); $45M in reduced inventory working capital from better demand forecasting; $25M in premium freight cost reduction from supply chain disruption prediction; $15M in quality cost reduction from earlier defect detection and product genealogy; $10M in procurement savings from data-driven supplier negotiations. Total 5-year value: $175M against a $12M platform investment — 14.6:1 ROI.",
+    "win_n1": "Over 5 years, the Supply Chain Intelligence Platform becomes the competitive differentiator in the company's operational strategy. Real-time visibility across 40 plants in 80 countries, combined with AI-powered demand forecasting and predictive maintenance, enables the company to commit to customer delivery performance guarantees that competitors operating with manual processes cannot match. The platform evolves into a supply chain digital twin — a virtual replica of the global network that simulates supply chain scenarios, optimizes production scheduling, and orchestrates logistics routing automatically in response to demand signals."
+  },
+  "story": {
+    "strategy": "The manufacturing enterprise chose a global-first architecture — building a unified Operational Entity model that works across all 40 plants before optimizing for any single plant — recognizing that the competitive advantage comes from cross-plant intelligence, not per-plant analytics that already exist in each plant's local MES. The medallion architecture with plant_id as a first-class citizen in every entity enables both plant-level operational analytics and cross-plant benchmarking and best-practice sharing from the same data model.",
+    "technology": "The platform uses Databricks DLT for real-time IoT sensor streaming from 50,000+ machines via OPC-UA and industrial Kafka bridges, Auto Loader for SAP RFC batch extracts, and a configurable harmonization layer in Silver that maps plant-local identifiers to global canonical identifiers using the ERP material master as the master reference. The demand forecasting ensemble uses Prophet, LightGBM, and neural time-series models managed in MLflow, with S&OP consensus adjustments stored alongside the AI forecast for transparent decision-making.",
+    "outcome": "Within 18 months, the platform covered all 40 plants with real-time OEE monitoring. The global OEE dashboard revealed a 14% performance gap between the top-quartile and bottom-quartile plants using the same equipment — gap analysis led to targeted best-practice sharing programs that improved bottom-quartile plant OEE by 8% in 6 months. Demand forecast MAPE improved from 22% to 10.8%, enabling a $32M reduction in global safety stock. The predictive maintenance pilot at 3 plants achieved 71% PPV and reduced unplanned downtime by 23%.",
+    "returnValue": "First-year measured returns: $18M in avoided unplanned downtime from predictive maintenance pilot; $32M in working capital reduction from improved demand forecasting accuracy; $12M in premium freight cost reduction from 5-day advance supply disruption warnings; $8M in production efficiency improvement from cross-plant OEE benchmarking and best-practice deployment. Total first-year return: $70M against a $6M platform investment — 11.7:1 ROI, with significant additional value as the platform scales to all 40 plants.",
+    "years": "Over 5 years, the Supply Chain Intelligence Platform evolves into the company's operational brain. Digital twins of each manufacturing line simulate production scheduling scenarios before committing resources. AI-powered autonomous procurement agents negotiate with suppliers using real-time demand signals and supplier risk scores. End-to-end product genealogy enables instant recall scope determination from supplier lot to customer delivery. The company achieves top-decile supply chain performance in its industry — a capability that enables premium pricing, preferred customer relationships, and a 5-year competitive moat that competitors using traditional analytics cannot close."
+  },
+  "playbook": {
+    "scenarioTitle": "Global Supply Chain & Manufacturing Intelligence Platform",
+    "scenarioSummary": "A global manufacturing enterprise needs to unify manufacturing, quality, logistics, supplier, and ERP data from 40 plants across 80 countries into a Databricks Lakehouse. The platform delivers real-time OEE monitoring, AI demand forecasting, predictive maintenance, supplier risk intelligence, and supply chain visibility — generating $175M in 5-year business value.",
+    "businessDrivers": [
+      "$80M annually in unplanned manufacturing downtime that predictive maintenance could reduce by 20-40%",
+      "Manual demand forecasting with 22% MAPE driving $45M+ in excess inventory and premium freight costs",
+      "No cross-plant production visibility — OEE comparison requires waiting for monthly plant manager reports",
+      "Supply chain disruptions discovered too late due to lack of real-time supplier delivery tracking",
+      "S&OP process requires 2 days to compile global demand forecast from 3 SAP instances manually"
+    ],
+    "constraints": [
+      "Data sovereignty requirements in China, Russia, and other markets require regional data residency",
+      "Production operations cannot be affected by the analytics platform — read-only integration is mandatory",
+      "40 plants with different MES vendors require a flexible harmonization approach without per-plant custom code"
+    ],
+    "recommendedEngagementApproach": [
+      "Quantify the unplanned downtime cost by plant and equipment type to size the predictive maintenance opportunity",
+      "Build the OEE cross-plant benchmarking case by showing the gap between top and bottom quartile plants using available MES data",
+      "Pilot with the North American region (8 plants) as the proof of concept before global deployment commitment",
+      "Present the ROI model to CSCO and CFO with a phased investment and return schedule"
+    ],
+    "confidenceRating": 88,
+    "recommendedConversationPath": [
+      "Downtime cost: What is the total annual cost of unplanned production downtime, and which equipment types drive the most?",
+      "Forecast quality: What is the current demand forecast MAPE and what is the business cost of forecast error?",
+      "Data landscape: How many MES systems, SAP instances, and plants? What interfaces exist today?",
+      "Sovereignty: Which countries have data localization requirements that affect architecture?",
+      "Quick wins: What is the one metric the CSCO or VP Manufacturing wants to see first?"
+    ],
+    "discoveryQuestions": [
+      {
+        "category": "Production Downtime",
+        "question": "What is the total annual cost of unplanned production downtime across all plants, and which 20% of equipment causes 80% of the impact?",
+        "whyItMatters": "The downtime cost quantifies the predictive maintenance ROI. Identifying the Pareto equipment set focuses the pilot on the highest-value machines, maximizing early ROI.",
+        "goodSignal": "$50M+ in annual downtime with 3-5 critical equipment types (presses, furnaces, CNC machines) responsible for 70%+ of impact — clear pilot target.",
+        "redFlag": "No visibility into downtime cost by equipment type — need to instrument this first before predictive maintenance ROI can be quantified."
+      },
+      {
+        "category": "Demand Forecasting",
+        "question": "What is the current S&OP forecast MAPE by product family and region, and how does forecast error manifest in business cost — excess inventory, stockouts, or premium freight?",
+        "whyItMatters": "Forecast MAPE and its business cost quantify the demand forecasting AI ROI. A 22% to 12% MAPE improvement translates to specific dollar savings that the CFO can validate.",
+        "goodSignal": "Known MAPE of 20%+ with documented inventory write-offs and premium freight costs — clear ROI quantification available.",
+        "redFlag": "MAPE is not measured or tracked — the team 'feels' the forecast is poor but can't quantify it. Need to establish measurement before the AI model's value can be demonstrated."
+      },
+      {
+        "category": "Data Architecture",
+        "question": "How many distinct MES vendors are in use across your 40 plants, and do plants share common material numbers and supplier codes or is there local variation?",
+        "whyItMatters": "MES vendor diversity and identifier consistency determine the harmonization complexity. 3 MES vendors is manageable; 15 different systems with local part number schemes is a multi-year integration project.",
+        "goodSignal": "2-3 MES vendors covering 80%+ of plants and SAP as the ERP providing material master as the global identifier reference — manageable harmonization.",
+        "redFlag": "15+ MES vendors with plant-local part numbers that don't map to any global standard — harmonization is a multi-year project before cross-plant analytics are possible."
+      },
+      {
+        "category": "IoT Readiness",
+        "question": "What percentage of your critical manufacturing equipment has IoT sensors deployed, and are sensor data transmitted to any central location today?",
+        "whyItMatters": "Sensor coverage and existing connectivity determine the predictive maintenance data availability. Low coverage or no connectivity requires hardware investment before the AI model can be built.",
+        "goodSignal": "70%+ of critical equipment has sensors with 6+ months of historical data available from a plant-level SCADA or historian — strong foundation for predictive maintenance.",
+        "redFlag": "Less than 30% sensor coverage and no historian — predictive maintenance requires hardware investment and 12+ months of data collection before model training is feasible. Delay predictive maintenance and focus on OEE analytics as the first use case."
+      },
+      {
+        "category": "Data Sovereignty",
+        "question": "In which specific countries do you have data sovereignty requirements, and what level of data detail is restricted — individual transaction data, aggregated KPIs, or all operational data?",
+        "whyItMatters": "Data sovereignty requirements determine the multi-region architecture complexity. Country-level restrictions on transaction data vs KPIs significantly affect the global analytics capability.",
+        "goodSignal": "Restrictions apply to individual transaction-level data (production records, product details) but aggregated KPIs (OEE percentages, throughput rates) are permitted to flow globally — manageable with regional Databricks workspaces and aggregation rules.",
+        "redFlag": "All operational data — including aggregated KPIs — must remain in-country for certain markets. Cross-plant benchmarking is legally restricted for those markets, significantly limiting the global analytics value."
+      }
+    ],
+    "problemFraming": {
+      "statement": "A global manufacturing enterprise operating 40 plants across 80 countries cannot achieve supply chain intelligence because manufacturing, quality, logistics, supplier, and ERP data are siloed in plant-local systems — preventing cross-plant benchmarking, AI-powered demand forecasting, predictive maintenance, and end-to-end supply chain visibility that would generate $175M in 5-year business value.",
+      "desiredOutcomes": [
+        "Real-time OEE monitoring across all 40 plants enabling cross-plant benchmarking and best-practice sharing",
+        "Demand forecast MAPE improved from 22% to under 12%, reducing $45M+ in inventory and freight costs",
+        "Predictive maintenance reducing unplanned downtime by 20%+ at pilot plants, saving $16M annually at scale",
+        "Supplier scorecard with weekly performance data enabling proactive risk management for 500+ global suppliers",
+        "End-to-end supply chain visibility enabling 5-day advance warning of supply disruptions"
+      ],
+      "assumptions": [
+        "North American plants can serve as a pilot region before global rollout",
+        "SAP material master can serve as the global canonical identifier reference for harmonization",
+        "IoT sensor data from critical equipment is available for predictive maintenance model training",
+        "Data sovereignty requirements allow aggregated KPIs to flow to a global analytics workspace"
+      ],
+      "nonNegotiables": [
+        "Production operations must be unaffected by the analytics platform — read-only integration only",
+        "Data sovereignty regional restrictions must be enforced at the platform architecture level",
+        "Plant-level access controls must prevent cross-plant data visibility without explicit authorization"
+      ],
+      "unknowns": [
+        "MES vendor and data quality variations at plants in Asia and Eastern Europe",
+        "Specific legal interpretation of data sovereignty requirements in China for aggregated KPI data",
+        "IoT sensor coverage and data quality at plants outside the North American pilot region"
+      ],
+      "framingStatement": "By building a global Supply Chain Intelligence Platform on Databricks that unifies all manufacturing and supply chain data sources, we enable the operational intelligence that transforms a fragmented 40-plant network into an integrated, AI-powered manufacturing enterprise — delivering $175M in 5-year value and a supply chain capability that outperforms every competitor still operating with manual processes."
+    },
+    "architectureOptions": [
+      {
+        "name": "Global Operational Entity Lakehouse",
+        "summary": "A medallion architecture with Operational Entities (Equipment, Work Order, Material, Supplier, Shipment) in Silver, AI-powered forecasting and maintenance in Gold, and multi-region deployment for data sovereignty — designed for a global manufacturing enterprise.",
+        "whenToUse": [
+          "40+ global plants requiring unified cross-plant operational analytics",
+          "IoT sensor data from 50,000+ machines requiring predictive maintenance AI",
+          "Multi-instance SAP requiring unified material and inventory visibility",
+          "Data sovereignty requirements necessitating regional data residency"
+        ],
+        "benefits": [
+          "Operational Entity model enables cross-plant analytics impossible in per-plant systems",
+          "Demand forecasting AI drives 10% MAPE improvement worth $45M+ in inventory and freight savings",
+          "Predictive maintenance generates 17:1 ROI from avoiding $80M annual downtime cost",
+          "Unity Catalog multi-region governance enforces data sovereignty without separate governance tools"
+        ],
+        "tradeoffs": [
+          "Multi-plant MES harmonization is a 12-18 month effort for full plant coverage",
+          "Data sovereignty multi-region deployment adds infrastructure complexity and cost",
+          "SAP integration complexity varies by instance customization level"
+        ],
+        "idealMaturityLevel": "Intermediate",
+        "platformMapping": [
+          "Auto Loader → SAP RFC batch extracts, MES batch files, QMS, EDI supplier data",
+          "DLT → IoT sensor streaming, logistics tracking events, production event streaming",
+          "Silver Operational Entities → Equipment, Work Order, Material, Supplier, Shipment",
+          "MLflow → demand forecasting ensemble, predictive maintenance model, supplier risk model",
+          "Unity Catalog → plant-level RBAC, data sovereignty region tags, quality audit trails"
+        ],
+        "components": [
+          { "layer": "Ingestion", "items": ["Auto Loader (SAP, MES, QMS, EDI)", "DLT (IoT streaming, logistics events)", "OPC-UA/Kafka bridge for plant sensors"] },
+          { "layer": "Silver", "items": ["Equipment entity (OEE, telemetry, maintenance)", "Work Order entity", "Material entity (inventory, demand)", "Supplier entity (performance scores)", "Shipment entity"] },
+          { "layer": "Gold", "items": ["OEE KPI dashboard", "Demand forecast (13-week by SKU-region)", "Predictive maintenance risk scores", "Supplier scorecards", "Inventory optimization recommendations"] },
+          { "layer": "Governance", "items": ["Unity Catalog (plant-level RBAC)", "Data sovereignty region tags", "ISO 9001 quality audit trails", "REACH/RoHS compliance flags"] }
+        ],
+        "talkTrack": [
+          "The Operational Entity model is the supply chain Rosetta Stone — it gives every plant's work order, every supplier's shipment, and every machine's sensor data a common language, enabling cross-plant analytics that were simply impossible when each plant was its own data island.",
+          "The demand forecasting ensemble doesn't just give you a number — it gives you confidence intervals, model attribution, and variance explanations so your S&OP team can see why the forecast changed from last week and decide whether to accept or adjust it with full information.",
+          "Unity Catalog's regional workspace model enforces your data sovereignty requirements at the architecture level — China plant data stays in the China workspace, European plant data stays in the EU workspace, and only aggregated KPIs flow to the global analytics layer. No policy memo needed; it's enforced by the database engine."
+        ]
+      }
+    ],
+    "mockInterview": [],
+    "customerQuestions": [
+      {
+        "question": "We have 3 different SAP instances with years of customizations. How does the platform handle the differences?",
+        "bestAnswer": "The Silver harmonization layer is designed for exactly this scenario. We use the SAP material master from each instance as the source of canonical identifiers — material numbers, plant codes, supplier codes — and build a global identifier mapping table that normalizes all three instances to a common canonical key. The mapping configuration handles the leading-zero issues, unit of measure conventions, and any local customizations that affect field formats. The mapping is stored in Unity Catalog as a reference table, making it transparent and auditable. New SAP customizations are handled by updating the mapping configuration rather than changing pipeline code.",
+        "notes": "SAP multi-instance complexity is the #1 technical concern for large manufacturing enterprises. The canonical identifier mapping approach is the right technical answer. Emphasize that it's configuration, not code — reducing change management overhead.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      },
+      {
+        "question": "Our production network engineers say we can't connect plant floor IoT sensors to the cloud — it's a security risk.",
+        "bestAnswer": "This is a legitimate security concern and the architecture addresses it without requiring direct cloud connectivity from the plant floor. The recommended approach is an industrial IoT gateway deployed within the plant's OT network (inside the firewall) that collects sensor data locally and transmits aggregated or anonymized time-series data to Kafka over an encrypted outbound connection on port 443. No inbound connections are required — the gateway pushes data out. This architecture is consistent with industrial security standards (IEC 62443) and has been deployed at major manufacturing companies with strict OT security postures.",
+        "notes": "OT network security is a real constraint, not an objection. The OT gateway architecture that pushes data outbound via HTTPS is the standard answer for plant-to-cloud IoT connectivity without exposing the OT network to inbound connections.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      }
+    ],
+    "risks": [
+      {
+        "title": "MES Harmonization Complexity at Scale",
+        "description": "40 plants using 5-10 different MES vendors with plant-local part numbering schemes require complex harmonization mapping that is difficult to maintain as plants upgrade MES software or change processes.",
+        "likelihood": "High",
+        "impact": "High",
+        "mitigation": "Establish an SAP material master as the authoritative global identifier reference before any Silver entity development begins. Build the harmonization mapping as configuration (not code) in Unity Catalog, enabling mapping updates without pipeline code changes. Phase plant onboarding regionally: Americas first (most likely to share MES vendors), then EMEA, then APAC. Allocate 6-8 weeks per plant cluster for harmonization configuration and validation."
+      },
+      {
+        "title": "Data Sovereignty Legal Interpretation",
+        "description": "Data sovereignty laws in China, Russia, and other markets are evolving and their application to aggregated manufacturing KPIs vs transaction-level data is ambiguous. Legal interpretation may restrict more data than the current architecture assumes.",
+        "likelihood": "Medium",
+        "impact": "High",
+        "mitigation": "Engage local legal counsel in China and Russia early in the architecture phase to obtain a written opinion on what data can flow to the global workspace. Design the aggregation boundary conservatively (aggregating at country level before any global transmission) until legal opinion is obtained. Build the regional workspace architecture to support full analytical capability for all plant teams regardless of global data flow restrictions."
+      },
+      {
+        "title": "IoT Sensor Data Quality and Coverage Gaps",
+        "description": "Plant IoT sensor deployments vary significantly: some plants have comprehensive sensor coverage with historian systems; others have partial coverage or no historian, making predictive maintenance models of varying quality across the fleet.",
+        "likelihood": "High",
+        "impact": "Medium",
+        "mitigation": "Conduct a sensor coverage assessment per plant as part of the onboarding process. For plants with low coverage, add sensor deployment to the capital plan before predictive maintenance model training begins. Use a portfolio approach: pilot predictive maintenance at plants with the best sensor coverage first, generating ROI that funds sensor expansion at under-covered plants. Clearly communicate that predictive maintenance value scales with sensor coverage."
+      }
+    ],
+    "deliverables": [
+      {
+        "name": "Global Supply Chain Intelligence Platform Architecture Blueprint",
+        "purpose": "Comprehensive technical design for the multi-region Databricks Lakehouse including MES harmonization approach, Operational Entity model, AI demand forecasting architecture, predictive maintenance design, and data sovereignty governance model.",
+        "outline": [
+          "Executive summary and 5-year ROI model",
+          "Global manufacturing data landscape assessment",
+          "MES harmonization architecture (identifier mapping, canonical schema)",
+          "SAP multi-instance integration design",
+          "Operational Entity model (Equipment, Work Order, Material, Supplier, Shipment)",
+          "IoT sensor streaming architecture (OPC-UA, Kafka, DLT)",
+          "Demand forecasting ensemble model design",
+          "Predictive maintenance architecture and pilot plant selection",
+          "Multi-region data sovereignty architecture",
+          "Unity Catalog governance model (plant-level RBAC, data sovereignty tags)",
+          "Regional pilot roadmap and global deployment phasing"
+        ]
+      }
+    ],
+    "executiveSummary": {
+      "sponsorReady": "We are building a Global Supply Chain Intelligence Platform on Databricks that connects all 40 of your manufacturing plants into a unified operational data layer — enabling real-time OEE benchmarking, AI demand forecasting that cuts inventory costs by $45M, predictive maintenance that reduces downtime by $16M annually, and supplier risk intelligence that prevents supply chain disruptions. This platform generates $175M in 5-year business value against a $12M investment.",
+      "thirtySecond": "Your 40 plants operate as 40 data islands — you can't benchmark OEE across plants in real time, your demand forecast has 22% error because it's assembled from 3 SAP instances in Excel, and your $80M annual unplanned downtime could be reduced by 20% with predictive AI. The Databricks Supply Chain Intelligence Platform connects all of it.",
+      "twoMinute": "Today your VP Manufacturing waits for monthly plant manager reports to compare OEE across facilities. Your S&OP team spends 2 days assembling demand data from 3 SAP instances before they can run a forecast. Your predictive maintenance program is reactive — equipment fails and then you fix it, at $80M annually. The Global Supply Chain Intelligence Platform changes all of this. MES data from all 40 plants flows into a unified Operational Entity model with real-time OEE by line, by plant, and by region — available on a single dashboard without a single phone call. The demand forecasting AI combines historical SAP sales data with market signals to produce a 13-week SKU-level forecast with MAPE under 12%, cutting $45M in excess inventory and premium freight. Predictive maintenance AI scores every critical machine's failure probability daily from IoT sensor data, enabling maintenance before failures occur — $16M in annual downtime cost avoided at full scale. Unity Catalog enforces plant-level access controls and data sovereignty requirements for China and other regulated markets. This is the operational intelligence infrastructure that gives you cross-plant visibility, AI-powered supply chain decision-making, and the competitive performance that modern manufacturing requires.",
+      "successIn12Months": [
+        "Real-time OEE dashboard live for all 40 plants with cross-plant benchmarking",
+        "Demand forecast MAPE under 15% (from 22%) with AI model in production S&OP",
+        "Predictive maintenance pilot validated at 3 plants with 65%+ PPV",
+        "Supplier scorecard covering 500+ global suppliers with weekly performance data",
+        "$50M+ in first-year business value documented (downtime reduction, inventory, freight)"
+      ]
+    },
+    "meetingChecklist": [
+      "Calculate total annual unplanned downtime cost by plant and equipment type",
+      "Research current demand forecast MAPE and associated inventory and freight cost",
+      "Prepare an OEE cross-plant comparison showing best vs worst plant performance gap",
+      "Know the number of MES vendors and SAP instances across the plant network",
+      "Identify data sovereignty countries and confirm whether aggregated KPIs can flow globally",
+      "Have the IoT gateway architecture diagram ready for the network security discussion"
+    ],
+    "nextSteps": [
+      "Schedule a supply chain data landscape assessment workshop with manufacturing, procurement, logistics, and IT leads",
+      "Conduct an IoT sensor coverage assessment at the top 5 plants by downtime cost",
+      "Request sample MES and SAP data extracts from 3 North American plants for pilot harmonization development",
+      "Engage local legal counsel in China and Russia for data sovereignty written opinion",
+      "Deliver a 12-week North American regional pilot proposal with OEE dashboard as the primary deliverable"
+    ],
+    "whiteboardTalkTrack": [
+      "Draw 40 circles representing plants, each with a local MES, SAP icon, and QMS — completely disconnected from each other",
+      "Show the pain: VP Manufacturing asking 'which plants have the best OEE this week?' — drawing manual email chain to each plant",
+      "Draw the lakehouse: Auto Loader collecting from all plants' MES batch exports and SAP RFC interfaces",
+      "Show the Silver Operational Entity model: Equipment, Work Order, Material, Supplier — all using global canonical identifiers",
+      "Show Gold layer outputs: global OEE dashboard, demand forecast with confidence intervals, supplier scorecard, predictive maintenance risk list",
+      "Show the IoT streaming: machines → OPC-UA → Kafka → DLT → predictive maintenance model → maintenance work order",
+      "Show Unity Catalog: plant-level locks, data sovereignty region tags, quality audit trails",
+      "Close with the competitive position: 'Real-time cross-plant intelligence with AI-powered forecasting and maintenance — this is what separates the industry leaders from those still managing by spreadsheet.'"
+    ],
+    "workshopPlan": [
+      "Day 1 Morning (3 hours): Manufacturing data landscape — map all MES systems, quality systems, SAP instances, EDI flows, and IoT sensor coverage across the plant network",
+      "Day 1 Afternoon (3 hours): Use case priority — rank OEE analytics, demand forecasting, predictive maintenance, and supplier risk by ROI and data readiness",
+      "Day 2 Morning (3 hours): Operational Entity model design — define canonical identifiers (SAP material master as reference), entity schemas, and harmonization approach",
+      "Day 2 Afternoon (2 hours): Data sovereignty and governance — identify country-specific restrictions and define regional workspace architecture",
+      "Wrap-up (1 hour): North American pilot scope, plant selection criteria, and 12-week deployment plan"
+    ],
+    "objections": [
+      {
+        "objection": "We tried to build a unified manufacturing data platform 5 years ago and it failed. Why will this be different?",
+        "response": "Previous manufacturing data platform failures typically had one of three root causes: (1) trying to standardize source systems before building analytics, (2) building the analytics before the data was good enough, or (3) starting with all plants simultaneously. Our approach is different: we use SAP material master as the canonical reference to harmonize data without changing source systems; we pilot with one region's best-data plants first; and we deliver business value (OEE dashboard, supplier scorecard) within 90 days before attempting full global scale. The phased approach with fast early wins builds organizational trust that a big-bang approach cannot."
+      },
+      {
+        "objection": "We're concerned about latency — our MES systems can't tolerate anything slowing down production.",
+        "response": "The analytics platform is strictly read-only from the production environment — we consume data from MES batch exports or from the plant historian, with no connection to the real-time production control layer. Production control (PLC, SCADA) is completely isolated from the analytics infrastructure. The analytics platform adds intelligence on top of production without creating any operational dependency on its availability. If the analytics platform is down, production continues exactly as it does today."
+      }
+    ]
+  }
+}

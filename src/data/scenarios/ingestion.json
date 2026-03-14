@@ -1,0 +1,520 @@
+{
+  "id": "ingestion-static",
+  "title": "Enterprise Data Ingestion Platform",
+  "updatedAt": "2026-03-14T00:00:00.000Z",
+  "input": {
+    "scenarioTitle": "Enterprise Data Ingestion Platform",
+    "industry": "Enterprise",
+    "customerType": "Enterprise",
+    "problemStatement": "A large enterprise needs to replace brittle, hand-coded ETL pipelines built over 15 years with a governed, scalable ingestion platform that supports batch files, CDC from operational databases, streaming events, and API sources — all with unified data quality monitoring, lineage, and operational observability.",
+    "businessGoals": "Replace fragile ETL infrastructure with a self-healing, governed ingestion platform that reduces pipeline failures by 80%, delivers data freshness SLAs across all sources, enables self-service source onboarding for business teams, and provides a data quality monitoring framework for the entire data estate.",
+    "constraints": "Legacy source systems cannot be modified, ingestion platform must support existing data consumers (Snowflake, Power BI, downstream microservices), 99.9% pipeline uptime required for business-critical sources, and the current team of 12 data engineers must manage the full platform.",
+    "timeline": "6-month migration for tier-1 pipelines, 12-month full platform rollout",
+    "currentState": "Over 300 hand-coded Apache Spark jobs managed in a legacy Oozie scheduler, 40% pipeline failure rate on a monthly basis, no centralized data quality monitoring, no data lineage tracking, and new pipeline development takes 4-6 weeks per source due to bespoke code.",
+    "desiredFutureState": "A unified Databricks ingestion platform with Auto Loader for files, Structured Streaming for CDC and events, Delta Live Tables for declarative pipeline management, Unity Catalog for lineage and quality governance, and a self-service source onboarding capability reducing new pipeline time to 3-5 days.",
+    "stakeholders": "VP of Data Engineering, CDO, VP of Analytics, CIO, Data Quality team, downstream analytics consumers",
+    "compliance": ["SOC 2 Type II", "GDPR", "Internal Data Governance Policy"],
+    "architecturePreference": "Medallion (Bronze/Silver/Gold) with Databricks as the unified ingestion and transformation platform",
+    "outputDepth": "Comprehensive"
+  },
+  "architecture": {
+    "title": "Enterprise Data Ingestion Platform Architecture",
+    "summary": "A unified Databricks ingestion platform replacing legacy ETL with Auto Loader for batch/file sources, Structured Streaming for CDC and events, Delta Live Tables for declarative pipelines, and Unity Catalog for lineage, quality governance, and observability across all data flows.",
+    "solutionOverview": "Enterprise data from files and object stores, operational databases (via CDC), APIs, and Kafka event streams flows into the Databricks Lakehouse through a unified ingestion layer. Auto Loader handles all file-based and batch sources with automatic schema inference and evolution. Structured Streaming handles CDC from operational databases using Debezium/Kafka change capture and raw Kafka event streams. Delta Live Tables orchestrates all ingestion pipelines declaratively with built-in data quality expectations, automatic retry, and self-healing behavior. The Bronze layer is the immutable, append-only raw data archive. The Silver layer applies enterprise data standards — PII handling, reference data enrichment, deduplication, and data type normalization. The Gold layer materializes analytics-ready data products consumed by BI tools, SQL Warehouses, and downstream microservices. Unity Catalog provides lineage, quality metrics, and access governance across the full data estate.",
+    "assumptions": [
+      "Debezium or similar CDC tool can be configured for the primary operational databases (Oracle, SQL Server, PostgreSQL)",
+      "Kafka is available as the event streaming backbone for both CDC events and application events",
+      "Cloud object storage is used for file-based sources (S3, ADLS, GCS)",
+      "Downstream consumers (Snowflake, Power BI) can query the Gold layer via Delta Sharing or SQL Warehouses",
+      "The team of 12 data engineers will receive Databricks training as part of the migration program"
+    ],
+    "details": [
+      {
+        "title": "Source Categories",
+        "body": "Four source categories requiring different ingestion patterns: Files/Object Stores (CSV, JSON, Parquet, XML files landing in S3/ADLS from vendor feeds, legacy exports, and partner data transfers) handled by Auto Loader; Operational Databases (Oracle, SQL Server, PostgreSQL) connected via CDC using Debezium capturing row-level change events to Kafka; APIs (REST and SOAP APIs from internal microservices, third-party SaaS systems, and partner APIs) connected via parameterized API connector framework; and Event Streams (Kafka topics from application event buses, IoT sensors, and clickstream events) connected via Structured Streaming."
+      },
+      {
+        "title": "Delta Live Tables Pipeline Architecture",
+        "body": "All ingestion pipelines are implemented as DLT pipelines rather than bespoke Spark jobs. DLT provides declarative pipeline definition (what to compute, not how), built-in data quality expectations with configurable pass/warn/fail behavior, automatic lineage tracking, self-healing retry logic, and pipeline observability through the DLT event log. A standardized pipeline template library covers the four source categories, reducing new pipeline development to configuration rather than coding."
+      },
+      {
+        "title": "Data Quality Framework",
+        "body": "A centralized data quality monitoring system is built on DLT expectations and a custom Great Expectations integration for business rule validation. Quality metrics — completeness, validity, consistency, uniqueness — are computed for every table in Bronze and Silver and stored in a Unity Catalog quality metrics schema. A Data Quality Monitoring dashboard provides real-time visibility into pipeline health and data quality scores across the full data estate."
+      },
+      {
+        "title": "Self-Service Onboarding",
+        "body": "A self-service source onboarding portal allows business teams to register new sources by providing connection details, schema documentation, and quality rules. The portal provisions an Auto Loader job, DLT pipeline, Unity Catalog schema, and access controls from a standard template. New file-based sources can be onboarded in 3-5 days without data engineering support for standard formats."
+      }
+    ],
+    "nodes": [
+      {
+        "id": "n-files",
+        "label": "Files / Object Stores",
+        "iconId": "source-files",
+        "vendor": "generic",
+        "notes": "CSV, JSON, Parquet, and XML files in S3/ADLS from vendor feeds, partner transfers, legacy system exports, and batch processes",
+        "x": 60,
+        "y": 80,
+        "metadata": { "group": "Data Sources" }
+      },
+      {
+        "id": "n-ops-db",
+        "label": "Operational Databases",
+        "iconId": "source-operational-db",
+        "vendor": "generic",
+        "notes": "Oracle, SQL Server, and PostgreSQL operational databases with Debezium CDC capturing row-level changes to Kafka topics",
+        "x": 60,
+        "y": 220,
+        "metadata": { "group": "Data Sources" }
+      },
+      {
+        "id": "n-apis",
+        "label": "APIs",
+        "iconId": "source-api-systems",
+        "vendor": "generic",
+        "notes": "REST and SOAP APIs from internal microservices, SaaS platforms, and partner systems with parameterized connector framework",
+        "x": 60,
+        "y": 360,
+        "metadata": { "group": "Data Sources" }
+      },
+      {
+        "id": "n-events",
+        "label": "Event Streams",
+        "iconId": "source-event-streams",
+        "vendor": "generic",
+        "notes": "Kafka topics carrying application events, IoT sensor data, clickstream events, and CDC change events from Debezium",
+        "x": 60,
+        "y": 500,
+        "metadata": { "group": "Data Sources" }
+      },
+      {
+        "id": "n-autoloader",
+        "label": "Auto Loader (Batch & Files)",
+        "iconId": "databricks-data-ingestion",
+        "vendor": "databricks",
+        "notes": "File discovery, schema inference, and incremental ingestion for all object store and file-based sources with automatic schema evolution",
+        "x": 290,
+        "y": 160,
+        "metadata": { "group": "Ingestion Layer" }
+      },
+      {
+        "id": "n-streaming",
+        "label": "Structured Streaming (CDC)",
+        "iconId": "databricks-etl-pipeline",
+        "vendor": "databricks",
+        "notes": "Structured Streaming for Kafka CDC events and raw event streams with exactly-once semantics and configurable watermarking",
+        "x": 290,
+        "y": 360,
+        "metadata": { "group": "Ingestion Layer" }
+      },
+      {
+        "id": "n-kafka",
+        "label": "Kafka / Event Bus",
+        "iconId": "source-event-streams",
+        "vendor": "generic",
+        "notes": "Kafka as the unified event bus aggregating CDC events from Debezium, application events, and IoT sensor streams",
+        "x": 170,
+        "y": 500,
+        "metadata": { "group": "Ingestion Layer" }
+      },
+      {
+        "id": "n-bronze",
+        "label": "Bronze Layer",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Immutable, append-only raw data archive in Delta format with full ingestion metadata, source checksums, and row-level audit history",
+        "x": 520,
+        "y": 280,
+        "metadata": { "group": "Bronze Layer" }
+      },
+      {
+        "id": "n-silver",
+        "label": "Silver Layer",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Enterprise standards applied: PII classification and masking, reference data enrichment, deduplication, type normalization, and business rule validation",
+        "x": 720,
+        "y": 280,
+        "metadata": { "group": "Silver Layer" }
+      },
+      {
+        "id": "n-gold",
+        "label": "Gold Layer",
+        "iconId": "databricks-lakehouse",
+        "vendor": "databricks",
+        "notes": "Analytics-ready data products, aggregated business entities, and domain-specific views consumed by BI tools and downstream microservices",
+        "x": 920,
+        "y": 280,
+        "metadata": { "group": "Gold Layer" }
+      },
+      {
+        "id": "n-uc",
+        "label": "Unity Catalog",
+        "iconId": "databricks-governance",
+        "vendor": "databricks",
+        "notes": "Data lineage across all layers, data quality metrics registry, PII classification, access policies, and data product catalog for the full data estate",
+        "x": 720,
+        "y": 530,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-workflows",
+        "label": "Workflow Orchestration",
+        "iconId": "databricks-workflows",
+        "vendor": "databricks",
+        "notes": "Databricks Workflows replacing legacy Oozie scheduler with dependency management, retry policies, SLA monitoring, and multi-source coordination",
+        "x": 520,
+        "y": 530,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-dq",
+        "label": "Data Quality Monitoring",
+        "iconId": "databricks-alerts",
+        "vendor": "databricks",
+        "notes": "DLT expectations and custom quality rules producing real-time data quality scores, anomaly alerts, and trend dashboards for all data assets",
+        "x": 920,
+        "y": 530,
+        "metadata": { "group": "Governance" }
+      },
+      {
+        "id": "n-bi",
+        "label": "BI & Reporting",
+        "iconId": "generic-dashboard",
+        "vendor": "generic",
+        "notes": "Downstream consumers: Power BI and Tableau via JDBC, Snowflake via Delta Sharing, downstream microservices via REST, and SQL Warehouses for self-service",
+        "x": 1160,
+        "y": 280,
+        "metadata": { "group": "Analytics" }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "n-files", "target": "n-autoloader", "label": "File discovery and ingestion", "protocol": "S3/ADLS" },
+      { "id": "e2", "source": "n-ops-db", "target": "n-kafka", "label": "CDC via Debezium", "protocol": "Kafka" },
+      { "id": "e3", "source": "n-apis", "target": "n-autoloader", "label": "API response to file/batch", "protocol": "REST" },
+      { "id": "e4", "source": "n-events", "target": "n-kafka", "label": "Application events", "protocol": "Kafka" },
+      { "id": "e5", "source": "n-kafka", "target": "n-streaming", "label": "Kafka consumer group", "protocol": "Kafka" },
+      { "id": "e6", "source": "n-autoloader", "target": "n-bronze", "label": "Incremental Delta write", "protocol": "Delta" },
+      { "id": "e7", "source": "n-streaming", "target": "n-bronze", "label": "Streaming Delta write", "protocol": "Delta" },
+      { "id": "e8", "source": "n-bronze", "target": "n-silver", "label": "DLT transformation", "protocol": "DLT" },
+      { "id": "e9", "source": "n-silver", "target": "n-gold", "label": "DLT aggregation", "protocol": "DLT" },
+      { "id": "e10", "source": "n-workflows", "target": "n-bronze", "label": "Batch orchestration", "protocol": "Workflows" },
+      { "id": "e11", "source": "n-bronze", "target": "n-uc", "label": "Lineage registration", "protocol": "Unity Catalog" },
+      { "id": "e12", "source": "n-silver", "target": "n-uc", "label": "Quality metrics and lineage", "protocol": "Unity Catalog" },
+      { "id": "e13", "source": "n-gold", "target": "n-bi", "label": "Downstream consumption", "protocol": "SQL/Delta Sharing" },
+      { "id": "e14", "source": "n-uc", "target": "n-dq", "label": "Quality metrics feed", "protocol": "Unity Catalog" },
+      { "id": "e15", "source": "n-gold", "target": "n-uc", "label": "Product registration", "protocol": "Unity Catalog" }
+    ],
+    "refinements": [
+      "Add a self-service source onboarding portal that provisions Auto Loader jobs and DLT pipelines from a web form without data engineering support",
+      "Implement Delta Sharing for Snowflake integration, enabling downstream Snowflake consumers to query Gold layer data without data movement",
+      "Build an impact analysis capability using Unity Catalog lineage to identify all downstream consumers affected when a source schema changes",
+      "Add a data freshness SLA monitoring system that alerts when Bronze data is not updated within the expected freshness window",
+      "Implement automated PII detection using presidio or similar tool to classify new data sources at ingestion time"
+    ]
+  },
+  "architectAnswers": {
+    "why_w1": "The enterprise's 300+ hand-coded Spark jobs represent 15 years of technical debt. Each pipeline was built by a different engineer, uses different error handling patterns, different logging conventions, and different retry logic. When a pipeline fails at 2 AM, the on-call engineer faces a unique codebase with no standard playbook. This operational unpredictability is the root cause of the 40% monthly pipeline failure rate that disrupts business analytics.",
+    "why_w2": "The legacy Oozie scheduler cannot express complex pipeline dependencies, retry logic, or SLA monitoring — all must be coded manually in each pipeline. When a pipeline fails, downstream consumers are notified by discovery (their report doesn't run) rather than by proactive alerting. Delta Live Tables and Databricks Workflows replace this with a modern orchestration layer that has these capabilities built in.",
+    "why_w3": "New data source onboarding currently takes 4-6 weeks because each new source requires a custom Spark job, custom Oozie workflow, custom monitoring, and a release process. This delay frustrates business stakeholders who need data quickly and forces them to create shadow data pipelines outside the governed platform. A standardized template-based onboarding process reduces this to 3-5 days for standard source types.",
+    "why_h1": "Data quality issues in the current platform are invisible until they cause downstream business problems — a report showing incorrect totals, a KPI that doesn't match the source system. There is no centralized data quality monitoring, no alerting, and no historical quality trend data. Business teams have lost confidence in the data platform's output. A DLT-based quality framework makes quality issues visible and actionable before they reach business consumers.",
+    "why_h2": "The absence of data lineage creates significant operational risk: when a source system changes its schema, the team has no way to quickly identify which downstream pipelines, reports, and ML models are affected. This has caused multiple production incidents where a source schema change broke dozens of downstream consumers before the team could identify the blast radius. Unity Catalog lineage eliminates this blind spot.",
+    "why_h3": "The current platform costs $2.3M annually in on-premises cluster maintenance, Oozie licensing, and data engineering labor dedicated to pipeline firefighting. The Databricks platform on cloud infrastructure is estimated to reduce this cost by $800K-1M annually while increasing pipeline reliability and capability — the business case is compelling beyond the technical improvements.",
+    "goal_g1": "The primary goal is replacing all 300+ legacy pipelines with DLT-based equivalents over 12 months, with tier-1 business-critical pipelines migrated first in 6 months. The target is achieving 99.9% pipeline uptime for tier-1 pipelines, down from the current 60% monthly reliability.",
+    "goal_g2": "Self-service source onboarding is the organizational transformation goal: by month 12, 50% of new data source requests should be fulfilled by business teams using the self-service portal without data engineering support, freeing the 12-person data engineering team for higher-value architecture and platform work.",
+    "goal_o1": "Operational target: pipeline failure rate drops from 40% to under 5% per month within 6 months of platform migration. Achieved through DLT's built-in retry logic, self-healing behavior, and proactive alerting that routes failures to the right team before business impact occurs.",
+    "goal_o2": "Data freshness target: 95% of Bronze layer data assets meet their defined SLA (from 1-hour for streaming sources to 24-hour for batch sources). A data freshness SLA dashboard tracks compliance and triggers alerts when SLAs are at risk, replacing the current reactive model where freshness issues are only discovered by business users.",
+    "goal_a1": "The platform must support 300+ concurrent DLT pipelines running in parallel during the nightly batch window (10 PM - 6 AM) with a compute auto-scaling configuration that minimizes cost during off-peak hours. Databricks cluster pooling and Enhanced Autoscaling deliver this without manual cluster sizing.",
+    "goal_a2": "Streaming pipelines for CDC sources must achieve sub-5-minute end-to-end latency from source database commit to Bronze Delta table availability, enabling near-real-time analytics for operational intelligence use cases.",
+    "goal_l1": "PII classification is applied automatically at ingestion for all new sources using a machine learning-based PII detector. Classified PII fields receive column-level masking in Unity Catalog, preventing unauthorized access to personal data. GDPR data subject access requests are fulfilled using Unity Catalog lineage to identify all tables containing a specific subject's data.",
+    "goal_l2": "Data access governance: each Unity Catalog table has a designated data owner responsible for access policy management. Downstream consumers request access through a self-service portal. Access grants are reviewed quarterly and revoked if no longer needed. All data access events are logged for SOC 2 audit purposes.",
+    "safe_s1": "The ingestion platform handles PII from HR, customer, and financial systems. Unity Catalog column-level masking policies encrypt or mask PII fields for unauthorized users. PII detection runs automatically on new sources using presidio. A PII registry in Unity Catalog tracks all tables containing personal data for GDPR compliance. PII handling SOPs define the review and approval process for new PII data sources.",
+    "safe_s2": "SOC 2 Type II controls: all pipeline code is version-controlled in Git with code review requirements. Deployment uses CI/CD with automated testing. Unity Catalog audit logs capture all data access. Cluster policies prevent unauthorized software installation. Access to production workspaces requires MFA. Change management process documents all platform changes with approval records.",
+    "safe_a1": "Delta Lake ACID transactions guarantee that partial pipeline failures never result in corrupt or incomplete Bronze tables that downstream consumers query. Auto Loader's exactly-once semantics ensure that files are never skipped or double-processed. CDC streaming with exactly-once semantics in Structured Streaming ensures that no database changes are lost or duplicated in the Bronze layer.",
+    "safe_a2": "Sensitive source credentials (database passwords, API keys) are stored in Databricks secrets manager backed by the enterprise's HashiCorp Vault. Credentials are never embedded in pipeline code or configuration files. Secret scopes are created per environment (dev, staging, prod) with least-privilege access. Credential rotation triggers an automated pipeline credential update without downtime.",
+    "safe_f1": "Bronze layer immutability: once data is written to Bronze, it is never modified or deleted (except for GDPR deletion requests which are handled through Delta Lake deletion vectors). All corrections to Bronze data are appended as new records with a correction flag, preserving the complete history of source data including errors. This enables complete auditability of the data lineage from source to Gold.",
+    "safe_e1": "Platform high availability: Databricks workspace is deployed across multiple availability zones. Delta Lake transaction logs are stored in object storage with 11-nines durability. Pipeline failure recovery is automated through DLT's built-in retry — no manual intervention required for transient failures. Target RTO for platform infrastructure failure: 1 hour.",
+    "safe_e2": "Business-critical pipeline SLAs have a defined incident response process: tier-1 pipeline failures trigger PagerDuty within 5 minutes of failure. The on-call engineer has a standardized playbook for each pipeline type. Pipeline failure root cause categories (source unavailable, schema change, data quality failure, compute failure) are tracked in a dashboard to identify systemic issues.",
+    "flow_f1": "Data flows left to right: source systems → ingestion layer (Auto Loader for files, Structured Streaming for CDC/events) → Bronze (immutable raw archive) → Silver (DLT transformation to enterprise standards) → Gold (DLT aggregation to analytics products) → downstream consumers (BI, SQL Warehouses, microservices). Unity Catalog, Workflows, and Data Quality Monitoring are horizontal governance layers across all medallion tiers.",
+    "flow_l1": "CDC streaming is the most complex flow: database commit → Debezium captures row-level change → Kafka event → Structured Streaming consumer → Bronze Delta table with MERGE operation (for upserts) → Silver SCD Type 2 history table → Gold current-state view. End-to-end latency target: under 5 minutes for 99th percentile events.",
+    "flow_o1": "Data quality flows: DLT pipeline expectations evaluate quality rules at Bronze ingestion and Silver transformation → quality events are written to the DLT event log → a DLT monitoring notebook aggregates quality metrics by table → quality scores are registered in Unity Catalog quality metrics schema → Data Quality Monitoring dashboard shows current scores and trends → PagerDuty alerts trigger when quality scores drop below thresholds.",
+    "flow_w1": "Orchestration patterns: DLT continuous pipelines run 24/7 for streaming sources with auto-scaling. DLT triggered pipelines run on schedule for batch sources with Databricks Workflows managing dependencies. Multi-source workflows use fan-out (parallel ingestion) then fan-in (Silver merge job that waits for all Bronze sources) patterns. SLA monitoring in Workflows triggers alerts when batch jobs miss their completion windows.",
+    "data_d1": "Source data domains are organized by business domain rather than source system: Customer Domain (CRM, billing, support ticket sources); Financial Domain (ERP, GL, AP/AR sources); Operational Domain (inventory, logistics, manufacturing systems); People Domain (HRIS, payroll, benefits systems); Product Domain (product catalog, usage telemetry, feature flags); and Partner Domain (supplier, distributor, third-party data feeds).",
+    "data_d2": "Reference data management is a critical capability of the Silver layer: industry codes (NAICS, SIC), geographic hierarchies (postal codes, regions, countries), product taxonomy, and organizational hierarchy are maintained as reference datasets in Unity Catalog. Silver transformation jobs enrich incoming data with reference codes, enabling consistent analytics across sources that use different local coding schemes.",
+    "data_a1": "Schema evolution is the most common operational challenge in production data pipelines. Source systems change their schemas without notice — adding columns, renaming fields, changing data types. Auto Loader's schema evolution mode handles additive changes (new columns) automatically. Breaking changes (column renames, type changes) trigger a quarantine of affected records and a schema change alert, giving the data team time to update the Silver transformation before downstream consumers are affected.",
+    "data_a2": "CDC data quality is affected by the completeness of Debezium configuration: some operational database tables have complex data types (JSON columns, arrays, custom types) that Debezium cannot capture natively. A per-table CDC capability assessment during migration identifies these cases and routes them to alternative ingestion patterns (full table snapshot vs CDC) where needed.",
+    "data_t1": "The Silver layer applies enterprise data standards: all timestamps are converted to UTC with timezone stored separately; all monetary amounts are stored in a base currency with the source currency and exchange rate; all identifiers are typed (customer_id, product_id, employee_id) and linked to the enterprise master data management system; all PII fields are classified and masked according to the enterprise data classification policy.",
+    "data_t2": "Delta Lake features used throughout: Z-ordering on frequently queried columns (entity_id, date columns) to reduce data scanned per query; data skipping statistics to enable partition pruning on non-date columns; time travel for data recovery and point-in-time replay; change data feed for downstream incremental consumption from Silver to Gold without re-reading the full table.",
+    "data_a3": "Data retention by domain: customer data is retained for 7 years per legal requirements; financial transaction data for 10 years; HR data for 7 years post-employment; operational logs for 2 years. Delta Lake lifecycle management automatically moves data older than the active retention period to cold storage with a 30-day deletion queue for final GDPR-compliance review before permanent deletion.",
+    "data_a4": "Unity Catalog lineage provides impact analysis when source schemas change: the lineage graph identifies all Silver tables derived from a changed Bronze table, and all Gold tables and BI reports derived from those Silver tables. This impact graph is surfaced in the self-service portal when a schema change is detected, enabling data owners to proactively notify affected downstream consumers.",
+    "fast_f1": "The fastest path to value is migrating the top 10 most frequently failing pipelines from the legacy platform to DLT in the first 4 weeks. These pipelines generate the most operational overhead and business disruption. Migrating them first demonstrates an immediate reliability improvement and builds the team's DLT proficiency before tackling the larger migration.",
+    "fast_f2": "The data quality monitoring dashboard can be deployed in 2-3 weeks on top of DLT expectations for the migrated pipelines, providing immediate visibility into quality issues that were previously invisible. This dashboard is high-visibility for the CDO and analytics leadership, demonstrating governance improvement early in the project.",
+    "fast_a1": "The 12-week migration fast track: Weeks 1-2 cover infrastructure setup, DLT pipeline templates for the four source categories, and migration of 5 pilot pipelines. Weeks 3-6 migrate all tier-1 (business-critical) pipelines — approximately 50 of the 300 — with full DLT expectations and Workflows orchestration. Weeks 7-10 migrate tier-2 pipelines. Weeks 11-12 retire the first legacy clusters and document the migration runbook.",
+    "fast_a2": "Use the DLT template library approach from day one: rather than migrating each legacy pipeline individually, build 4 standard DLT templates (file batch, CDC streaming, API, Kafka event) and use them to regenerate migrated pipelines from configuration. This converts the 300-pipeline migration from a bespoke-coding project into a configuration management project — dramatically faster and more consistent.",
+    "fast_s1": "Quick wins in 90 days: (1) 50 tier-1 pipelines migrated to DLT with DLT expectations replacing custom monitoring; (2) Data quality monitoring dashboard live with scores for all migrated pipelines; (3) Databricks Workflows SLA monitoring replacing manual Oozie job tracking; (4) Unity Catalog lineage graph available for all migrated pipelines. Each win is visible to business stakeholders.",
+    "fast_t1": "Databricks Terraform provider automates workspace and cluster provisioning. A migration assessment script analyzes the existing Oozie XML workflow files and identifies DLT conversion patterns, estimating migration effort per pipeline. The DLT pipeline template library is available on Databricks GitHub and can be customized with enterprise-specific patterns in the first week.",
+    "fast_t2": "The Databricks auto-migration tool (where available) can convert some Spark SQL-based Oozie jobs to DLT pipelines automatically. Even for jobs that require manual conversion, a standardized conversion guide (Oozie action → DLT notebook, Oozie dependency → Databricks Workflows task dependency, Oozie email action → Databricks alert) dramatically reduces the per-pipeline migration effort.",
+    "run_r1": "Platform operations with 12 data engineers: 4 engineers own the ingestion layer and source onboarding; 4 engineers own Bronze-to-Silver transformation logic; 2 engineers own Gold layer product development; 1 engineer owns platform infrastructure and monitoring; 1 engineer owns data governance (Unity Catalog policies, quality rules). On-call rotation covers all 12 engineers with a defined playbook per pipeline failure category.",
+    "run_r2": "Cloud cost management: DLT Enhanced Autoscaling right-sizes compute to the current data volume, avoiding the over-provisioned fixed clusters of the legacy platform. Databricks cluster pools reduce cluster start time and maintain warm compute for frequent jobs. Estimated annual cost comparison: legacy platform $2.3M → Databricks platform $900K-1.2M — a $1.1-1.4M annual saving after migration.",
+    "run_u1": "Pipeline deployment uses CI/CD: all DLT pipeline code is version-controlled in Git with pull request review requirements. A CI pipeline runs DLT expectations against a test dataset to catch regression before promotion to staging and production. Production deployment requires approval from a senior data engineer. Rollback is instant using Delta Lake time travel to revert Bronze/Silver tables to pre-deployment state.",
+    "run_u2": "Schema change management process: Auto Loader schema change detection triggers a GitHub issue with the affected pipelines identified through Unity Catalog lineage. The data engineer assigned to that source reviews the change, updates the Silver transformation, and deploys through the CI/CD pipeline. Business stakeholders are notified via Slack with an estimated resolution time. Target resolution time: 4 hours for breaking schema changes.",
+    "run_n1": "The ingestion platform is deployed in the enterprise's primary cloud region. Network security groups restrict cluster egress to approved data sources (source databases, SFTP servers, API endpoints). All source credentials are stored in the enterprise's HashiCorp Vault and rotated quarterly. VPN connectivity to on-premises data sources is managed through site-to-site VPN with dedicated bandwidth allocation for peak batch windows.",
+    "win_w1": "Platform success metrics at 12 months: (1) 300 legacy pipelines fully migrated and decommissioned; (2) Monthly pipeline failure rate under 5% (from 40%); (3) Data freshness SLA compliance above 95% for all tiers; (4) New source onboarding time under 5 days for 80% of requests; (5) Data quality dashboard in active use by business stakeholders with weekly review cadence.",
+    "win_i1": "Business impact: $1.2M annual infrastructure and licensing savings from legacy platform decommission; $800K annual reduction in data engineering labor devoted to pipeline firefighting (freed for new capabilities); $500K reduction in business impact costs from analytics unavailability; Self-service onboarding enabling 3x increase in new data source integration rate. Total 3-year value: $7.5M.",
+    "win_n1": "The unified ingestion platform creates a governed data foundation that compounds in value over 3-5 years. Every new data source onboarded through the standard template immediately has lineage, quality monitoring, and governance — capabilities that would have required months of custom work in the old platform. The data engineering team transitions from pipeline maintenance to data product development, accelerating the delivery of AI and advanced analytics capabilities across the enterprise."
+  },
+  "story": {
+    "strategy": "The enterprise chose Delta Live Tables as the architectural foundation of the new ingestion platform because it shifts the paradigm from 'how to run pipelines' to 'what the data should look like' — a declarative approach that eliminates the bespoke retry logic, error handling, and monitoring code that made each legacy pipeline unique and difficult to maintain. The DLT template library converts a 300-pipeline migration from a massive bespoke coding effort into a configuration management project.",
+    "technology": "The platform uses Auto Loader for all file-based sources, leveraging its cloud-native file discovery with S3/ADLS event notifications to eliminate polling and dramatically reduce ingestion latency. Structured Streaming with Debezium-to-Kafka CDC provides sub-5-minute data freshness from operational databases. Unity Catalog lineage is the operational intelligence layer — when a source changes, the lineage graph immediately shows the full downstream blast radius, enabling proactive incident management.",
+    "outcome": "Within 12 months, all 300 legacy pipelines were migrated to DLT. Monthly pipeline failure rate dropped from 40% to 3.8%. The on-call team's average weekly incident count dropped from 15 to 2. The self-service onboarding portal processed 47 new source requests in its first quarter, with 38 fulfilled by business teams without data engineering support. Data freshness SLA compliance reached 97.2% across all tiers.",
+    "returnValue": "First-year financial impact: $1.1M in infrastructure savings from legacy cluster decommission; $750K in data engineering labor redirected from firefighting to new capabilities; $380K in business impact costs avoided from analytics availability improvement. Legacy platform decommission also eliminated $200K in annual Oozie and legacy tooling licenses. Total first-year return: $2.43M against a migration investment of $1.8M — paid back in 9 months.",
+    "years": "Over 5 years, the governed ingestion platform becomes the enterprise's data supply chain — the reliable infrastructure that powers every analytics, ML, and AI initiative. New capabilities (real-time personalization, predictive operations, AI agents) are built on a platform they can trust because the ingestion layer never introduces silent data quality failures or unexplained data gaps. The 12-person data engineering team, freed from pipeline maintenance, becomes a data products team building ML features and Gold layer products that directly generate business value."
+  },
+  "playbook": {
+    "scenarioTitle": "Enterprise Data Ingestion Platform",
+    "scenarioSummary": "A large enterprise needs to replace 300+ hand-coded legacy ETL pipelines with a governed, scalable Databricks ingestion platform using Auto Loader, Structured Streaming, and Delta Live Tables. The platform delivers 99.9% pipeline uptime, centralized data quality monitoring, Unity Catalog lineage, and self-service source onboarding.",
+    "businessDrivers": [
+      "40% monthly pipeline failure rate causing frequent business analytics disruptions costing the company $380K annually",
+      "4-6 week new source onboarding time forcing business teams to build shadow pipelines outside governance",
+      "No data quality monitoring — quality issues are discovered by business users rather than the data team",
+      "No lineage tracking — source schema changes cause cascading downstream failures with unknown blast radius",
+      "Legacy platform costs $2.3M annually with declining reliability and no path to streaming or AI capabilities"
+    ],
+    "constraints": [
+      "Legacy source systems cannot be modified — ingestion must work with existing interfaces",
+      "Existing downstream consumers (Snowflake, Power BI) cannot change their query patterns during migration",
+      "12-person data engineering team must manage migration without additional headcount"
+    ],
+    "recommendedEngagementApproach": [
+      "Conduct a pipeline inventory assessment to classify all 300+ pipelines by tier, failure frequency, and migration complexity",
+      "Deliver a DLT template proof of concept migrating the 3 most frequently failing pipelines in 2 weeks",
+      "Present POC results with a 12-month migration roadmap and cost savings analysis to VP Engineering and CDO",
+      "Propose a phased migration starting with tier-1 pipelines to demonstrate reliability improvement quickly"
+    ],
+    "confidenceRating": 93,
+    "recommendedConversationPath": [
+      "Pain quantification: What does 40% pipeline failure mean in business terms — what analytics are affected?",
+      "Source inventory: How many pipelines, what source types, what are the tier-1 business-critical ones?",
+      "Team skills: What is the team's current Spark and Python proficiency?",
+      "Downstream consumers: What tools consume the data and what are their query patterns?",
+      "Budget and timeline: What is the approved migration budget and business-imposed deadline?"
+    ],
+    "discoveryQuestions": [
+      {
+        "category": "Pipeline Inventory",
+        "question": "How many distinct data pipelines exist today, how are they classified by business criticality, and which 10-20 pipelines cause the most business impact when they fail?",
+        "whyItMatters": "The pipeline count determines migration scope; criticality classification determines sequencing; high-impact failures define the first migration targets.",
+        "goodSignal": "Team has a pipeline inventory spreadsheet with failure history — the 20% most critical pipelines are well-known and prioritized.",
+        "redFlag": "No pipeline inventory exists — team doesn't know how many pipelines exist or which are business-critical. Significant assessment work before migration begins."
+      },
+      {
+        "category": "Source Types",
+        "question": "What percentage of your pipelines ingest from files, operational databases (CDC), APIs, and streaming sources — and what formats are most common?",
+        "whyItMatters": "Source type distribution determines which DLT templates need to be built. File-heavy portfolios are easiest to migrate; CDC-heavy requires Debezium/Kafka setup which has longer lead time.",
+        "goodSignal": "70%+ file-based sources — straightforward Auto Loader migration. CDC sources are a known subset that can be phased.",
+        "redFlag": "50%+ CDC sources from complex Oracle or mainframe systems — requires significant Debezium configuration and testing before migration can begin."
+      },
+      {
+        "category": "Downstream Consumers",
+        "question": "What tools consume the data produced by these pipelines, and do any consumers have real-time or near-real-time latency requirements today?",
+        "whyItMatters": "Downstream consumer requirements constrain the migration approach. Consumers requiring 5-minute data freshness cannot tolerate a migration that changes latency characteristics.",
+        "goodSignal": "Primarily batch BI consumers (Power BI, Tableau) with T+1 requirements — no streaming latency requirements during migration.",
+        "redFlag": "Operational microservices consuming data with sub-minute latency requirements — migration cannot interrupt data freshness without significant downstream coordination."
+      },
+      {
+        "category": "Team Skills",
+        "question": "What is the data engineering team's experience with Databricks, PySpark, and SQL, and how much of their current time is spent on pipeline maintenance vs new development?",
+        "whyItMatters": "Team skills determine training investment needed. Time split between maintenance and development quantifies the organizational benefit of reducing pipeline failure rates.",
+        "goodSignal": "Team has solid Python/SQL skills and has used Databricks for some workloads. Currently spending 70%+ on maintenance — massive potential to shift to development.",
+        "redFlag": "Team is Java-based Spark 2.x developers with no cloud experience — significant reskilling required alongside migration, extending timeline."
+      },
+      {
+        "category": "Data Quality",
+        "question": "How do data quality issues currently get detected — by the data team or by business users? What is the average time from issue occurrence to resolution?",
+        "whyItMatters": "The current detection method quantifies the data quality monitoring opportunity. User-detected issues indicate no proactive monitoring — a high-value improvement.",
+        "goodSignal": "Business users detect quality issues 2-3 days after they occur, causing report corrections and business decision delays. No automated monitoring exists.",
+        "redFlag": "Already have a data quality monitoring tool (Great Expectations, Monte Carlo) — the opportunity is integration with Databricks, not building from scratch."
+      }
+    ],
+    "problemFraming": {
+      "statement": "A large enterprise's data engineering organization cannot deliver reliable, timely, or governed data to business consumers because 300+ hand-coded legacy ETL pipelines built over 15 years have become too fragile, too expensive, and too slow to evolve — blocking analytics, AI, and operational intelligence initiatives.",
+      "desiredOutcomes": [
+        "Monthly pipeline failure rate reduced from 40% to under 5%",
+        "New source onboarding time reduced from 4-6 weeks to 3-5 days via self-service templates",
+        "Data quality monitoring dashboard deployed for all pipelines with automated alerting",
+        "Full data lineage available for all data assets in Unity Catalog",
+        "Legacy platform decommissioned within 12 months, saving $1.2M annually"
+      ],
+      "assumptions": [
+        "Debezium CDC can be configured for the primary operational databases within 4-6 weeks",
+        "Cloud object storage is already in use for file-based ingestion",
+        "Kafka is available or will be provisioned as the CDC event bus",
+        "The 12-person team can complete the migration with appropriate training and tooling"
+      ],
+      "nonNegotiables": [
+        "Zero downtime for tier-1 business-critical pipelines during migration",
+        "Downstream consumer query patterns cannot change during migration (backward compatibility)",
+        "All PII data must be classified and masked in the new platform before decommissioning PHI-containing legacy pipelines"
+      ],
+      "unknowns": [
+        "Completeness of the existing pipeline inventory and whether shadow pipelines exist outside the catalog",
+        "Complexity of CDC configuration for Oracle and mainframe sources",
+        "Whether all legacy pipeline business logic can be replicated in DLT without bespoke code"
+      ],
+      "framingStatement": "By replacing 300 bespoke ETL pipelines with a standardized DLT-based ingestion platform, we transform data engineering from a maintenance function into a platform capability — delivering reliable, governed data to every analytics and AI initiative while freeing the team to build rather than fix."
+    },
+    "architectureOptions": [
+      {
+        "name": "Unified DLT Ingestion Platform with Auto Loader + CDC",
+        "summary": "A comprehensive Databricks ingestion platform using DLT for declarative pipeline management, Auto Loader for files, Structured Streaming for CDC/events, and Unity Catalog for lineage and governance — the recommended approach for replacing legacy ETL at scale.",
+        "whenToUse": [
+          "300+ legacy ETL pipelines requiring modernization",
+          "Multiple source types (files, CDC, APIs, streaming) requiring unified ingestion",
+          "Data quality monitoring requirements across the full data estate",
+          "SOC 2 and governance requirements requiring lineage and access controls"
+        ],
+        "benefits": [
+          "DLT templates reduce new pipeline development from weeks to days",
+          "Built-in retry and self-healing eliminates the custom error handling code in legacy pipelines",
+          "Unity Catalog lineage provides impact analysis when source schemas change",
+          "Auto Loader's cloud-native file discovery eliminates polling and reduces ingestion latency"
+        ],
+        "tradeoffs": [
+          "DLT has some constraints on pipeline customization compared to hand-coded Spark",
+          "Debezium CDC setup for complex databases (Oracle, mainframe) adds 4-6 weeks of setup time",
+          "Migration of 300 pipelines requires sustained engineering investment over 12 months"
+        ],
+        "idealMaturityLevel": "Intermediate",
+        "platformMapping": [
+          "Auto Loader → all file-based sources (CSV, JSON, Parquet, XML)",
+          "Debezium + Kafka + Structured Streaming → CDC from Oracle/SQL Server/PostgreSQL",
+          "DLT → all pipeline orchestration and transformation logic",
+          "Unity Catalog → lineage, quality metrics, PII governance, access policies",
+          "Databricks Workflows → batch scheduling, dependencies, SLA monitoring"
+        ],
+        "components": [
+          { "layer": "Ingestion", "items": ["Auto Loader (file/batch)", "Structured Streaming (CDC, Kafka)", "API connector framework"] },
+          { "layer": "Orchestration", "items": ["Databricks Workflows (scheduling, dependencies)", "DLT (declarative pipeline management)", "Pipeline template library (4 templates)"] },
+          { "layer": "Quality", "items": ["DLT expectations (Bronze/Silver)", "Great Expectations integration (business rules)", "Data Quality Monitoring dashboard"] },
+          { "layer": "Governance", "items": ["Unity Catalog (lineage, access control)", "PII classification (presidio)", "SOC 2 audit logging"] }
+        ],
+        "talkTrack": [
+          "DLT is the answer to the bespoke pipeline problem — instead of each pipeline having unique error handling, retry logic, and monitoring, every DLT pipeline has these built in as platform capabilities.",
+          "Auto Loader is fundamentally different from your legacy file ingestion — it uses cloud storage event notifications to discover new files instantly, rather than polling, eliminating the latency and fragility of your current approach.",
+          "Unity Catalog lineage means that when Finance's Oracle ERP schema changes, you know within minutes which of your 300 pipelines are affected and which Gold layer reports will break — before business users discover the problem."
+        ]
+      }
+    ],
+    "mockInterview": [],
+    "customerQuestions": [
+      {
+        "question": "How do we migrate 300 pipelines without disrupting the business? We can't have a big-bang cutover.",
+        "bestAnswer": "We recommend a phased migration where legacy pipelines and new DLT pipelines run in parallel during a validation period. New DLT pipeline output is compared to legacy pipeline output daily using a reconciliation job. When outputs match for 2 weeks straight, the legacy pipeline is decommissioned and the DLT pipeline is promoted. Tier-1 pipelines run in parallel for 4 weeks; lower-tier pipelines run for 2 weeks. No cutover requires simultaneous changes to all pipelines.",
+        "notes": "Parallel-run migration is the safest approach and reduces migration risk significantly. The customer's primary concern is business disruption — address this directly with the parallel-run approach.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      },
+      {
+        "question": "Our existing downstream consumers query Snowflake. Do they need to change anything?",
+        "bestAnswer": "No. Delta Sharing lets Snowflake query your Gold layer Delta tables directly with zero data movement, zero changes to Snowflake, and zero changes to your Snowflake users' query patterns. Alternatively, we can maintain the current Snowflake export as one of the Gold layer delivery mechanisms. Either way, Snowflake consumers see no change during migration — we validate that their query results are identical before decommissioning any legacy pipeline.",
+        "notes": "Downstream consumer continuity is critical for migration success. Delta Sharing is an elegant solution for Snowflake integration. Always validate output parity before decommissioning.",
+        "weakAnswer": null,
+        "strongAnswer": null
+      }
+    ],
+    "risks": [
+      {
+        "title": "Incomplete Pipeline Inventory",
+        "description": "Shadow pipelines built by business teams outside IT governance may not be discovered during the initial inventory, creating a risk of unplanned legacy pipelines still running after the migration is declared complete.",
+        "likelihood": "Medium",
+        "impact": "Medium",
+        "mitigation": "Conduct a cloud resource audit to identify all running Spark clusters and Oozie jobs. Survey business teams to identify any independently managed data pipelines. Create a pipeline registration requirement where any new pipeline must be registered in the platform catalog as a governance control."
+      },
+      {
+        "title": "Oracle CDC Complexity",
+        "description": "Debezium CDC for Oracle databases requires Oracle LogMiner configuration, which is complex and requires DBA cooperation. Oracle-sourced pipelines may take 2-3x longer to migrate than file-based pipelines.",
+        "likelihood": "High",
+        "impact": "Medium",
+        "mitigation": "Engage the Oracle DBA team in the migration planning phase. Assess LogMiner licensing and configuration requirements for each Oracle database. Plan Oracle CDC pipelines for later migration phases while file-based pipelines are migrated first. Consider full-table snapshot + incremental updates as an intermediate approach for Oracle sources where LogMiner is not feasible."
+      },
+      {
+        "title": "DLT Template Limitations for Complex Pipelines",
+        "description": "Some legacy pipelines contain complex business logic, multi-source joins, or workflow patterns that DLT's declarative model cannot easily express, requiring bespoke DLT notebook development.",
+        "likelihood": "Medium",
+        "impact": "Low",
+        "mitigation": "During the pipeline inventory, classify each pipeline by DLT migration complexity (template-compatible, template with customization, custom notebook required). Allocate additional migration time for complex pipelines. Where DLT is genuinely not appropriate (complex orchestration logic), use Databricks Workflows with parameterized Spark notebooks rather than forcing DLT."
+      }
+    ],
+    "deliverables": [
+      {
+        "name": "Enterprise Ingestion Platform Architecture and Migration Plan",
+        "purpose": "Comprehensive technical design and 12-month migration roadmap for replacing legacy ETL with the Databricks DLT-based ingestion platform.",
+        "outline": [
+          "Pipeline inventory assessment and tier classification",
+          "DLT pipeline template library design (4 source type templates)",
+          "Ingestion architecture (Auto Loader, Structured Streaming, CDC design)",
+          "Bronze/Silver/Gold medallion layer design",
+          "Unity Catalog governance model (lineage, quality, PII, access)",
+          "Data quality monitoring framework design",
+          "Parallel-run migration methodology",
+          "12-month migration roadmap by tier",
+          "Cost savings and ROI model"
+        ]
+      }
+    ],
+    "executiveSummary": {
+      "sponsorReady": "We are replacing your 300-pipeline legacy ETL platform with a governed Databricks ingestion system that will reduce monthly pipeline failures from 40% to under 5%, cut new source onboarding time from 6 weeks to 5 days, and save $1.2M annually in infrastructure costs — all while building the reliable data foundation your analytics and AI programs require.",
+      "thirtySecond": "Your 300 hand-coded legacy ETL pipelines fail 40% of the time, take 6 weeks to add a new source, and have no data quality monitoring or lineage. The Databricks DLT platform replaces all of this with self-healing pipelines, 5-day source onboarding, and centralized lineage — for less money than you're spending today.",
+      "twoMinute": "Today your data engineering team spends 70% of their time fighting pipeline fires. A 40% monthly failure rate means your business users don't trust the data. Adding a new data source takes 6 weeks because each pipeline requires custom code. When Finance's ERP schema changes, you don't know which of your 300 pipelines are affected until reports break. The Databricks ingestion platform fixes all of this. Delta Live Tables replaces bespoke Spark jobs with declarative pipelines that have self-healing retry, built-in data quality expectations, and automatic lineage tracking — all as platform capabilities, not custom code. Auto Loader discovers new files instantly using cloud storage events, eliminating polling. Debezium and Structured Streaming deliver CDC data from your operational databases in under 5 minutes. A self-service onboarding portal lets business teams register new file sources and have data flowing in 3-5 days. Unity Catalog shows the complete lineage from any Gold table back to the source system — and identifies every downstream consumer the moment a source schema changes. This is the data infrastructure foundation your analytics and AI programs need. You already pay $2.3M a year for a platform with 40% failure rates. The Databricks platform delivers better reliability for $1.2M less.",
+      "successIn12Months": [
+        "All 300 legacy pipelines migrated and legacy platform decommissioned",
+        "Monthly pipeline failure rate under 5%",
+        "Self-service onboarding portal handling 50% of new source requests without data engineering support",
+        "Data quality monitoring dashboard live with 95%+ of pipelines showing quality scores",
+        "$1.2M in annual infrastructure savings realized"
+      ]
+    },
+    "meetingChecklist": [
+      "Calculate the business cost of the 40% pipeline failure rate: how many reports are delayed, how many business decisions are affected?",
+      "Research whether the customer has experienced any business incidents caused by data quality failures",
+      "Prepare a DLT template demo showing how quickly a new file-based pipeline can be created",
+      "Have the Unity Catalog lineage visualization ready to show impact analysis for a schema change",
+      "Know the customer's cloud provider and whether Kafka/MSK/Event Hubs is already in use",
+      "Prepare the cost comparison: legacy platform $2.3M vs Databricks estimated $900K-1.2M"
+    ],
+    "nextSteps": [
+      "Schedule a 2-day pipeline inventory assessment workshop with the data engineering team",
+      "Request access to sample pipeline code from the top 10 failure-causing pipelines for POC conversion",
+      "Identify the 3 most business-critical pipelines for the DLT parallel-run pilot",
+      "Deliver a 2-week POC migrating the 3 pilot pipelines with side-by-side output comparison",
+      "Present POC results and 12-month migration roadmap to VP Engineering and CDO"
+    ],
+    "whiteboardTalkTrack": [
+      "Draw the current state: 300 boxes of individual Spark jobs, connected by Oozie arrows, all failing 40% of the time",
+      "Show the pain points: custom error handling in each box, no monitoring layer, no lineage, no quality checks",
+      "Draw the new architecture: 4 source type templates feeding into a unified ingestion layer",
+      "Show DLT: declarative pipelines where the platform handles retry, quality, and lineage automatically",
+      "Show Auto Loader: cloud storage events triggering instant file discovery vs polling",
+      "Show the medallion layers: Bronze (raw archive), Silver (enterprise standards), Gold (analytics products)",
+      "Show Unity Catalog horizontally across all layers: lineage, quality metrics, access governance",
+      "Close with the team transformation: from 70% maintenance to 70% building new capabilities"
+    ],
+    "workshopPlan": [
+      "Day 1 Morning (3 hours): Pipeline inventory and tier classification — work through the pipeline catalog with the data engineering team to classify all 300 pipelines by source type, business criticality, and migration complexity",
+      "Day 1 Afternoon (3 hours): DLT template design — for each of the 4 source types, design the standard DLT pipeline template with the data engineers who will build it",
+      "Day 2 Morning (3 hours): Governance design — Unity Catalog schema design, data quality rule taxonomy, PII classification approach",
+      "Day 2 Afternoon (2 hours): Migration roadmap — sequence pipelines by tier, define parallel-run methodology, resource plan for 12-month migration",
+      "Wrap-up (1 hour): POC scope definition, pilot pipeline selection, success metrics"
+    ],
+    "objections": [
+      {
+        "objection": "Our pipelines have years of complex business logic that can't be replicated in a declarative DLT framework.",
+        "response": "DLT notebooks support arbitrary Python and SQL code — they are not limited to declarative transformations. Complex business logic lives in DLT notebook cells just as it would in regular Spark notebooks, with the added benefit of DLT's quality expectations, lineage, and self-healing behavior. For the very small percentage of pipelines with orchestration complexity that DLT cannot express, Databricks Workflows with parameterized Spark notebooks provides the flexibility needed. We'll classify all 300 pipelines by DLT compatibility during the assessment phase."
+      },
+      {
+        "objection": "We've tried modernizing our pipelines before and it never sticks. Why will this be different?",
+        "response": "Previous modernization attempts likely failed because they required rewriting pipelines without changing the underlying engineering approach — one bespoke pipeline replaced by another bespoke pipeline in a different framework. The DLT template approach is structurally different: instead of rewriting 300 custom pipelines, we build 4 templates and configure 300 pipelines from those templates. The templates encode best practices for retry, monitoring, and quality that individual engineers don't have to think about. The platform capability, not individual engineer discipline, ensures the patterns stick."
+      }
+    ]
+  }
+}

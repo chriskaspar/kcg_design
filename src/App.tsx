@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { jsPDF } from "jspdf";
 import { Activity, ArrowRight, Bot, ChevronDown, ClipboardCopy, Code2, FileOutput, FolderOpen, Maximize2, Minimize2, Moon, PanelLeftClose, PanelLeftOpen, Plus, Save, Search, Sparkles, SunMedium, FileText } from "lucide-react";
@@ -58,31 +58,6 @@ const createMockResponse = (request: string, scenarioInput: ScenarioInput, curre
   assistantMessage: "Scenario playbook refreshed. Review the design board, adjust the narrative, and use the scenario sections to prepare the meeting."
 });
 
-const autoLayoutArchitecture = (architecture: ArchitectureSpec): ArchitectureSpec => {
-  const laneColumns = ["Source Systems", "Ingestion", "Platform / Processing", "Governance", "Consumption / AI"];
-  const grouped = laneColumns.reduce<Record<string, ArchitectureSpec["nodes"]>>((acc, lane) => {
-    acc[lane] = [];
-    return acc;
-  }, {});
-
-  architecture.nodes.forEach((node) => {
-    const lane = laneColumns.includes(node.lane ?? "") ? (node.lane as string) : "Platform / Processing";
-    grouped[lane].push(node);
-  });
-
-  const nodes = laneColumns.flatMap((lane, laneIndex) =>
-    grouped[lane].map((node, rowIndex) => ({
-      ...node,
-      x: 80 + laneIndex * 300,
-      y: 90 + rowIndex * 120
-    }))
-  );
-
-  return {
-    ...architecture,
-    nodes
-  };
-};
 
 function App() {
   const initialUrlState = readInitialUrlState();
@@ -114,6 +89,7 @@ function App() {
   const [sectionDrafts, setSectionDrafts] = useState<Record<string, string>>({});
   const [isGeneratingDesign, setIsGeneratingDesign] = useState(false);
   const [isGeneratingSolution, setIsGeneratingSolution] = useState(false);
+  const canvasExportRef = useRef<(() => Promise<string | null>) | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -470,7 +446,7 @@ function App() {
     doc.save("scenario-playbook.pdf");
   };
 
-  const exportFullReportPdf = () => {
+  const exportFullReportPdf = async () => {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = 500;
     let y = 48;
@@ -552,8 +528,25 @@ function App() {
       addGap(12);
     }
 
-    // Section 4: Solution
-    addLine("Section 4 — Solution", 14, true);
+    // Section 4: Architecture diagram image
+    if (canvasExportRef.current) {
+      try {
+        const imgData = await canvasExportRef.current();
+        if (imgData) {
+          doc.addPage();
+          addLine("Section 4 — Architecture Diagram", 14, true);
+          addGap(10);
+          // A4 content width ~500pt; height proportional to 16:9
+          doc.addImage(imgData, "PNG", 48, y, 500, 281);
+          y += 295;
+        }
+      } catch {
+        // diagram unavailable — skip
+      }
+    }
+
+    // Section 5: Solution
+    addLine("Section 5 — Solution", 14, true);
     addGap(4);
     if (solutionNarrative?.trim()) {
       addLine("Solution Narrative", 11, true);
@@ -635,27 +628,28 @@ function App() {
 
             {/* Main scenario body — big, editable */}
             <div className="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-2">
-              <div className="flex flex-col border-r border-white/10 p-6">
+              <div className="flex min-h-0 flex-col overflow-y-auto border-r border-white/10 p-6">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Scenario / Use Case</p>
                 <textarea
                   value={scenarioInput.problemStatement}
                   onChange={(e) => updateScenarioField("problemStatement", e.target.value)}
                   placeholder="Describe the customer scenario and use case in detail. What is the organization trying to solve? What triggered this initiative? Who is involved and what do they need?"
-                  className="min-h-0 flex-1 resize-none bg-transparent text-base leading-8 text-slate-100 outline-none placeholder:text-slate-700"
+                  rows={8}
+                  className="w-full resize-y rounded-[14px] border border-white/10 bg-white/5 p-3 text-sm leading-7 text-slate-100 outline-none placeholder:text-slate-700 focus:border-cyan-500/40"
                 />
+                <div className="mt-4">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Business Goals</p>
+                  <textarea
+                    value={scenarioInput.businessGoals}
+                    onChange={(e) => updateScenarioField("businessGoals", e.target.value)}
+                    placeholder="What are the top business goals driving this initiative?"
+                    rows={4}
+                    className="w-full resize-y rounded-[14px] border border-white/10 bg-white/5 p-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500/40"
+                  />
+                </div>
               </div>
               <div className="flex min-h-0 flex-col overflow-y-auto p-6">
                 <div className="space-y-4">
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Business Goals</p>
-                    <textarea
-                      value={scenarioInput.businessGoals}
-                      onChange={(e) => updateScenarioField("businessGoals", e.target.value)}
-                      placeholder="What are the top business goals driving this initiative?"
-                      rows={3}
-                      className="w-full resize-y rounded-[14px] border border-white/10 bg-white/5 p-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500/40"
-                    />
-                  </div>
                   <div>
                     <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Current State</p>
                     <textarea
@@ -695,14 +689,7 @@ function App() {
                       className="w-full rounded-[14px] border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500/40"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => { setChatOpen(true); setChatDraft(scenarioInput.problemStatement || scenarioInput.scenarioTitle); }}
-                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-cyan-500/15 py-3 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-500/25"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    Generate playbook from this scenario
-                  </button>
+
                 </div>
               </div>
             </div>
@@ -877,9 +864,9 @@ function App() {
               onArchitectureChange={setArchitecture}
               compactNodes={compactDesignNodes}
               onToggleCompactNodes={() => setCompactDesignNodes((current) => !current)}
-              onAutoLayout={() => setArchitecture((current) => autoLayoutArchitecture(current))}
               onGenerateDesign={handleGenerateDesign}
               isGeneratingDesign={isGeneratingDesign}
+              exportRef={canvasExportRef}
             />
           </div>
         </div>
@@ -977,6 +964,25 @@ function App() {
                   <BulletList items={architecture.assumptions} dark />
                 )}
               </InfoPanel>
+
+              {playbook.risks?.length ? (
+                <InfoPanel title="Key Risks">
+                  <div className="space-y-3">
+                    {playbook.risks.slice(0, 3).map((risk) => (
+                      <div key={risk.title} className="rounded-2xl bg-white/5 p-3">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-semibold text-white">{risk.title}</p>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${risk.likelihood === "High" ? "bg-rose-500/20 text-rose-300" : risk.likelihood === "Medium" ? "bg-amber-500/20 text-amber-300" : "bg-slate-500/20 text-slate-300"}`}>{risk.likelihood}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${risk.impact === "High" ? "bg-rose-500/20 text-rose-300" : risk.impact === "Medium" ? "bg-amber-500/20 text-amber-300" : "bg-slate-500/20 text-slate-300"}`}>{risk.impact} impact</span>
+                          </div>
+                        </div>
+                        <p className="text-xs leading-5 text-slate-400 line-clamp-2">{risk.mitigation}</p>
+                      </div>
+                    ))}
+                  </div>
+                </InfoPanel>
+              ) : null}
             </div>
 
             {/* Right column */}
@@ -1057,24 +1063,6 @@ function App() {
                 <p className="mt-1 text-xs text-slate-500">Overall solution confidence</p>
               </InfoPanel>
 
-              {playbook.risks?.length ? (
-                <InfoPanel title="Key Risks">
-                  <div className="space-y-3">
-                    {playbook.risks.slice(0, 3).map((risk) => (
-                      <div key={risk.title} className="rounded-2xl bg-white/5 p-3">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <p className="text-sm font-semibold text-white">{risk.title}</p>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${risk.likelihood === "High" ? "bg-rose-500/20 text-rose-300" : risk.likelihood === "Medium" ? "bg-amber-500/20 text-amber-300" : "bg-slate-500/20 text-slate-300"}`}>{risk.likelihood}</span>
-                            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${risk.impact === "High" ? "bg-rose-500/20 text-rose-300" : risk.impact === "Medium" ? "bg-amber-500/20 text-amber-300" : "bg-slate-500/20 text-slate-300"}`}>{risk.impact} impact</span>
-                          </div>
-                        </div>
-                        <p className="text-xs leading-5 text-slate-400 line-clamp-2">{risk.mitigation}</p>
-                      </div>
-                    ))}
-                  </div>
-                </InfoPanel>
-              ) : null}
             </div>
           </div>
         </div>

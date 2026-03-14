@@ -1,0 +1,42 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: Build
+    args:
+      - build
+      - -t
+      - ${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}/${_SERVICE_NAME}:$BUILD_ID
+      - .
+      - -f
+      - Dockerfile
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push
+    args:
+      - push
+      - ${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}/${_SERVICE_NAME}:$BUILD_ID
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --platform=managed
+      - --image=${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}/${_SERVICE_NAME}:$BUILD_ID
+      - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,gcb-build-id=$BUILD_ID
+      - --region=${_DEPLOY_REGION}
+      - --allow-unauthenticated
+      - --set-env-vars=PIPELINE_UI_HOST=0.0.0.0,PIPELINE_UI_PORT=8080
+      - --quiet
+
+images:
+  - ${_AR_HOSTNAME}/$PROJECT_ID/cloud-run-source-deploy/${_SERVICE_NAME}/${_SERVICE_NAME}:$BUILD_ID
+
+substitutions:
+  _AR_HOSTNAME: us-central1-docker.pkg.dev
+  _DEPLOY_REGION: us-central1
+  _SERVICE_NAME: kcg-design-ui
+
+options:
+  logging: CLOUD_LOGGING_ONLY

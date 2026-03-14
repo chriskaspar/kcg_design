@@ -141,30 +141,32 @@ const applyLayout = (mode: LayoutMode, nodes: ArchitectureSpec["nodes"]): Archit
     }
   } else if (mode === 5) {
     // Horizontal layers — each group is a uniform full-width band, stacked top-to-bottom.
-    // All bands use the same column count so every layer spans the same width → rectangle overall.
+    // COLS is fixed to the largest group so every band starts at the same X and the
+    // buildGroupLayouts equalizeWidths option stretches shorter groups to match.
     const groups = Array.from(groupMap.values());
     const maxCount = Math.max(1, ...groups.map((m) => m.length));
-    const COLS = Math.min(maxCount, 6);
-    const COL_W = 280, ROW_H = 130, PAD_X = 48, PAD_Y = 42, LAYER_GAP = 68;
+    const COLS = Math.min(maxCount, 7);
+    const COL_W = 284, ROW_H = 130, START_X = 56, PAD_Y = 44, LAYER_GAP = 72;
     let gY = 60;
     for (const members of groups) {
       members.forEach((n, i) =>
-        result.push({ ...n, x: PAD_X + (i % COLS) * COL_W, y: gY + PAD_Y + Math.floor(i / COLS) * ROW_H })
+        result.push({ ...n, x: START_X + (i % COLS) * COL_W, y: gY + PAD_Y + Math.floor(i / COLS) * ROW_H })
       );
       const rows = Math.ceil(members.length / COLS);
       gY += PAD_Y * 2 + rows * ROW_H + LAYER_GAP;
     }
   } else if (mode === 6) {
     // Vertical layers — each group is a uniform full-height band, placed side-by-side.
-    // All bands use the same row count so every layer spans the same height → rectangle overall.
+    // ROWS is fixed to the largest group so every band starts at the same Y and the
+    // buildGroupLayouts equalizeHeights option stretches shorter groups to match.
     const groups = Array.from(groupMap.values());
     const maxCount = Math.max(1, ...groups.map((m) => m.length));
-    const ROWS = Math.min(maxCount, 5);
-    const COL_W = 280, ROW_H = 122, PAD_X = 42, PAD_Y = 48, LAYER_GAP = 68;
+    const ROWS = Math.min(maxCount, 6);
+    const COL_W = 284, ROW_H = 126, START_Y = 56, PAD_X = 44, LAYER_GAP = 72;
     let gX = 60;
     for (const members of groups) {
       members.forEach((n, i) =>
-        result.push({ ...n, x: gX + PAD_X + Math.floor(i / ROWS) * COL_W, y: PAD_Y + (i % ROWS) * ROW_H })
+        result.push({ ...n, x: gX + PAD_X + Math.floor(i / ROWS) * COL_W, y: START_Y + (i % ROWS) * ROW_H })
       );
       const cols = Math.ceil(members.length / ROWS);
       gX += PAD_X * 2 + cols * COL_W + LAYER_GAP;
@@ -317,8 +319,12 @@ const nodeTypes = {
   architectureGroup: CanvasGroup
 };
 
-const buildGroupLayouts = (nodes: ArchitectureSpec["nodes"]) => {
-  const groups = new Map<string, { id: string; x: number; y: number; width: number; height: number; label: string }>();
+const buildGroupLayouts = (
+  nodes: ArchitectureSpec["nodes"],
+  options?: { equalizeWidths?: boolean; equalizeHeights?: boolean }
+) => {
+  type GroupLayout = { id: string; x: number; y: number; width: number; height: number; label: string };
+  const raw = new Map<string, GroupLayout>();
 
   Array.from(
     nodes.reduce<Map<string, ArchitectureSpec["nodes"]>>((acc, node) => {
@@ -332,7 +338,7 @@ const buildGroupLayouts = (nodes: ArchitectureSpec["nodes"]) => {
     const minY = Math.min(...members.map((item) => item.y));
     const maxX = Math.max(...members.map((item) => item.x + NODE_WIDTH));
     const maxY = Math.max(...members.map((item) => item.y + NODE_HEIGHT));
-    groups.set(group, {
+    raw.set(group, {
       id: `group_${group.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
       label: group,
       x: minX - GROUP_PADDING_X,
@@ -342,6 +348,14 @@ const buildGroupLayouts = (nodes: ArchitectureSpec["nodes"]) => {
     });
   });
 
+  // For layered layouts, force all groups to share the same width or height so
+  // every band is uniform — making the overall diagram look like a rectangle.
+  const vals = Array.from(raw.values());
+  const maxW = options?.equalizeWidths  ? Math.max(...vals.map((g) => g.width))  : undefined;
+  const maxH = options?.equalizeHeights ? Math.max(...vals.map((g) => g.height)) : undefined;
+
+  const groups = new Map<string, GroupLayout>();
+  raw.forEach((g, key) => groups.set(key, { ...g, width: maxW ?? g.width, height: maxH ?? g.height }));
   return groups;
 };
 
@@ -453,7 +467,13 @@ export function DesignCanvas({
     };
   }, [exportRef]);
 
-  const groupLayouts = useMemo(() => buildGroupLayouts(architecture.nodes), [architecture.nodes]);
+  const groupLayouts = useMemo(
+    () => buildGroupLayouts(architecture.nodes, {
+      equalizeWidths:  layoutMode === 5 || layoutMode === 7,
+      equalizeHeights: layoutMode === 6,
+    }),
+    [architecture.nodes, layoutMode]
+  );
 
   const flowNodes = useMemo(() => {
     const groupNodes: Node<GroupNodeData>[] = Array.from(groupLayouts.values()).map((group) => ({

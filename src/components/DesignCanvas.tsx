@@ -1,4 +1,4 @@
-import { Download, Map as MapIcon, MoveDiagonal2, Rows3, Text } from "lucide-react";
+import { Activity, Download, Map as MapIcon, MoveDiagonal2, Rows3, Sparkles, Text } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
@@ -28,6 +28,8 @@ interface DesignCanvasProps {
   compactNodes?: boolean;
   onToggleCompactNodes?: () => void;
   onAutoLayout?: () => void;
+  onGenerateDesign?: () => void;
+  isGeneratingDesign?: boolean;
 }
 
 type CanvasNodeData = {
@@ -227,7 +229,9 @@ export function DesignCanvas({
   onArchitectureChange,
   compactNodes = false,
   onToggleCompactNodes,
-  onAutoLayout
+  onAutoLayout,
+  onGenerateDesign,
+  isGeneratingDesign = false
 }: DesignCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [minimapOpen, setMinimapOpen] = useState(true);
@@ -331,46 +335,49 @@ export function DesignCanvas({
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5 text-white">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-300">Design Board</p>
-          <h2 className="max-w-[320px] truncate text-sm font-semibold" title={displayTitle}>{displayTitle}</h2>
+          <h2 className="truncate text-xs text-slate-400" title={displayTitle}>{displayTitle}</h2>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs text-slate-400 md:inline-flex">
-            <MoveDiagonal2 className="h-3.5 w-3.5" />
-            Drag, connect, and drop from toolbox
-          </span>
           <button
             type="button"
             onClick={onToggleCompactNodes}
-            className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
-            title={compactNodes ? "Show node descriptions" : "Hide node descriptions"}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
+            title={compactNodes ? "Show details" : "Compact"}
           >
             {compactNodes ? <Text className="h-3.5 w-3.5" /> : <Rows3 className="h-3.5 w-3.5" />}
-            {compactNodes ? "Show details" : "Compact"}
           </button>
           <button
             type="button"
             onClick={onAutoLayout}
-            className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
-            title="Auto layout nodes by lane"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
+            title="Auto layout"
           >
             <MoveDiagonal2 className="h-3.5 w-3.5" />
-            Auto layout
           </button>
           <button
             type="button"
             onClick={() => setMinimapOpen((open) => !open)}
-            className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition ${minimapOpen ? "bg-white/15 text-slate-200" : "bg-white/10 text-slate-200 hover:bg-white/15"}`}
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold transition ${minimapOpen ? "bg-white/15 text-slate-200" : "bg-white/10 text-slate-200 hover:bg-white/15"}`}
             title={minimapOpen ? "Hide minimap" : "Show minimap"}
           >
             <MapIcon className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
+            onClick={onGenerateDesign}
+            disabled={isGeneratingDesign || !onGenerateDesign}
+            className="inline-flex items-center gap-1.5 rounded-full bg-cyan-500/15 px-2.5 py-1.5 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-500/25 disabled:opacity-50"
+            title={isGeneratingDesign ? "Generating..." : "Generate Design"}
+          >
+            {isGeneratingDesign ? <Activity className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            type="button"
             onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-cyan-400"
+            className="inline-flex items-center gap-1.5 rounded-full bg-cyan-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-cyan-400"
+            title="Export PNG"
           >
             <Download className="h-3.5 w-3.5" />
-            Export PNG
           </button>
         </div>
       </div>

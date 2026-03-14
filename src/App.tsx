@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { jsPDF } from "jspdf";
-import { Activity, ArrowRight, Bot, ClipboardCopy, Code2, FileOutput, FolderOpen, Maximize2, Minimize2, Moon, PanelLeftClose, PanelLeftOpen, Plus, Save, Search, Sparkles, SunMedium, FileText } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Activity, ArrowRight, Bot, ChevronDown, ClipboardCopy, Code2, FileOutput, FolderOpen, Maximize2, Minimize2, Moon, PanelLeftClose, PanelLeftOpen, Plus, Save, Search, Sparkles, SunMedium, FileText } from "lucide-react";
 import { DesignCanvas } from "./components/DesignCanvas";
 import { DiscoveryPanel } from "./components/DiscoveryPanel";
 import { StoryTab } from "./components/StoryTab";
@@ -23,13 +22,6 @@ const createMessage = (role: ChatMessage["role"], content: string): ChatMessage 
   role,
   content
 });
-
-const loadingSteps = [
-  "Framing problem...",
-  "Generating discovery questions...",
-  "Designing architecture options...",
-  "Preparing mock interview..."
-];
 
 const workspaceTabs: WorkspaceTab[] = ["Scenario", "Discovery", "Design", "Solution", "Story"];
 
@@ -100,11 +92,9 @@ function App() {
   const [playbook, setPlaybook] = useState<ScenarioPlaybook>(samplePlaybook);
   const [scenarioInput, setScenarioInput] = useState<ScenarioInput>(starterScenarioInput);
   const [solutionNarrative, setSolutionNarrative] = useState<string>(sampleArchitecture.solutionOverview);
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const messages = initialMessages;
   const [chatOpen, setChatOpen] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadingStep, setLoadingStep] = useState(loadingSteps[0]);
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>(starterScenarios);
   const [toolboxOpen, setToolboxOpen] = useState(initialUrlState.services);
   const [sidecarOpen, setSidecarOpen] = useState(false);
@@ -118,6 +108,12 @@ function App() {
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [jsonEditorOpen, setJsonEditorOpen] = useState<"scenario" | "architecture" | null>(null);
   const [newScenarioOpen, setNewScenarioOpen] = useState(false);
+  const [wizardInitialText, setWizardInitialText] = useState("");
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [editingSections, setEditingSections] = useState<Set<string>>(new Set());
+  const [sectionDrafts, setSectionDrafts] = useState<Record<string, string>>({});
+  const [isGeneratingDesign, setIsGeneratingDesign] = useState(false);
+  const [isGeneratingSolution, setIsGeneratingSolution] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -170,19 +166,16 @@ function App() {
     window.history.replaceState({}, "", nextUrl);
   }, [compactDesignNodes, selectedStaticScenarioId, toolboxExpandAll, toolboxOpen, workspaceTab]);
 
+
   useEffect(() => {
-    if (!loading) {
-      return;
-    }
-
-    let index = 0;
-    const interval = window.setInterval(() => {
-      index = (index + 1) % loadingSteps.length;
-      setLoadingStep(loadingSteps[index]);
-    }, 1400);
-
-    return () => window.clearInterval(interval);
-  }, [loading]);
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && workspaceFullscreen) {
+        setWorkspaceFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  }, [workspaceFullscreen]);
 
   const groupedIcons = useMemo(() => getGroupedIcons(), []);
   const filteredIcons = useMemo(() => {
@@ -209,16 +202,6 @@ function App() {
         .filter(([, categories]) => Object.keys(categories).length > 0)
     ) as Record<string, Record<string, IconDefinition[]>>;
   }, [groupedIcons, toolboxQuery]);
-  const riskChart = useMemo(
-    () =>
-      playbook.risks.map((risk) => ({
-        name: risk.title,
-        impact: risk.impact === "High" ? 3 : risk.impact === "Medium" ? 2 : 1,
-        likelihood: risk.likelihood === "High" ? 3 : risk.likelihood === "Medium" ? 2 : 1
-      })),
-    [playbook]
-  );
-
   const updateScenarioField = (field: keyof ScenarioInput, value: string | string[]) => {
     setScenarioInput((current) => ({
       ...current,
@@ -246,58 +229,6 @@ function App() {
     }));
   };
 
-  const runGeneration = async (request: string) => {
-    if (!request.trim()) {
-      return;
-    }
-
-    const nextMessages = [...messages, createMessage("user", request)];
-    setMessages(nextMessages);
-    setLoading(true);
-    setLoadingStep(loadingSteps[0]);
-
-    try {
-      const mockResponse = createMockResponse(request, scenarioInput, architecture);
-      const response = await fetch("/api/studio/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          request,
-          scenarioInput,
-          currentArchitecture: architecture,
-          currentPlaybook: playbook,
-          messages: nextMessages,
-          mockResponse
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error("Studio generation failed");
-      }
-
-      const payload = (await response.json()) as {
-        architecture: ArchitectureSpec;
-        playbook: ScenarioPlaybook;
-        assistantMessage: string;
-      };
-
-      const normalizedArchitecture = normalizeArchitecture(payload.architecture);
-      setArchitecture(normalizedArchitecture);
-      setSolutionNarrative(payload.architecture.solutionOverview);
-      setPlaybook(payload.playbook);
-      setMessages((current) => [...current, createMessage("assistant", payload.assistantMessage)]);
-      setWorkspaceTab("Scenario");
-      setChatDraft("");
-      setChatOpen(false);
-    } catch {
-      setMessages((current) => [
-        ...current,
-        createMessage("assistant", "Generation failed, so the studio kept the current content. Check the API configuration or continue in mock mode.")
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const saveScenario = () => {
     const saved: SavedScenario = {
@@ -384,6 +315,79 @@ function App() {
     }
   };
 
+  const handleGenerateDesign = async () => {
+    setIsGeneratingDesign(true);
+    try {
+      const mockResponse = createMockResponse("generate design", scenarioInput, architecture);
+      const response = await fetch("/api/studio/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          request: "Generate architecture design",
+          scenarioInput,
+          architectAnswers,
+          currentArchitecture: architecture,
+          currentPlaybook: playbook,
+          messages,
+          mockResponse
+        })
+      });
+      if (response.ok) {
+        const payload = (await response.json()) as { architecture: ArchitectureSpec; playbook: ScenarioPlaybook; assistantMessage: string };
+        setArchitecture(normalizeArchitecture(payload.architecture));
+        setPlaybook(payload.playbook);
+      } else {
+        setArchitecture(normalizeArchitecture(mockResponse.architecture));
+        setPlaybook(mockResponse.playbook);
+      }
+    } catch {
+      // Keep existing architecture unchanged on failure
+    } finally {
+      setIsGeneratingDesign(false);
+    }
+  };
+
+  const handleGenerateSolution = async () => {
+    setIsGeneratingSolution(true);
+    try {
+      const mockResponse = createMockResponse("generate solution", scenarioInput, architecture);
+      const response = await fetch("/api/studio/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          request: "Generate solution narrative",
+          scenarioInput,
+          architectAnswers,
+          currentArchitecture: architecture,
+          currentPlaybook: playbook,
+          messages,
+          mockResponse
+        })
+      });
+      if (response.ok) {
+        const payload = (await response.json()) as { architecture: ArchitectureSpec; playbook: ScenarioPlaybook; assistantMessage: string };
+        const normalizedArch = normalizeArchitecture(payload.architecture);
+        setArchitecture(normalizedArch);
+        setSolutionNarrative(normalizedArch.solutionOverview);
+        setPlaybook(payload.playbook);
+      } else {
+        const brief = [
+          scenarioInput.problemStatement,
+          scenarioInput.businessGoals,
+          scenarioInput.desiredFutureState
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .slice(0, 400);
+        setSolutionNarrative(brief || mockResponse.architecture.solutionOverview);
+      }
+    } catch {
+      // Keep existing solution unchanged
+    } finally {
+      setIsGeneratingSolution(false);
+    }
+  };
+
   const handleSaveScenarioJson = (parsed: unknown) => {
     const data = parsed as { input?: typeof scenarioInput; playbook?: typeof playbook; architecture?: typeof architecture; architectAnswers?: ArchitectAnswers; story?: StoryOutput };
     if (data.input) setScenarioInput(data.input);
@@ -400,27 +404,6 @@ function App() {
     const arch = normalizeArchitecture(parsed as typeof architecture);
     setArchitecture(arch);
     setSolutionNarrative(arch.solutionOverview || solutionNarrative);
-  };
-
-  const exportExecutiveSummary = () => {
-    const summary = [
-      playbook.executiveSummary.sponsorReady,
-      "",
-      `30-second version: ${playbook.executiveSummary.thirtySecond}`,
-      "",
-      `2-minute version: ${playbook.executiveSummary.twoMinute}`,
-      "",
-      "12-month success indicators:",
-      ...playbook.executiveSummary.successIn12Months.map((item) => `- ${item}`)
-    ].join("\n");
-
-    const blob = new Blob([summary], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "executive-summary.txt";
-    anchor.click();
-    URL.revokeObjectURL(url);
   };
 
   const exportAssessmentPdf = () => {
@@ -485,6 +468,118 @@ function App() {
     });
 
     doc.save("scenario-playbook.pdf");
+  };
+
+  const exportFullReportPdf = () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = 500;
+    let y = 48;
+
+    const addLine = (text: string, fontSize = 11, isBold = false, indent = 0) => {
+      doc.setFontSize(fontSize);
+      doc.setFont("helvetica", isBold ? "bold" : "normal");
+      const lines = doc.splitTextToSize(text, pageWidth - indent);
+      doc.text(lines, 48 + indent, y);
+      y += 16 * lines.length;
+      if (y > 760) { doc.addPage(); y = 48; }
+    };
+
+    const addGap = (px = 8) => { y += px; if (y > 760) { doc.addPage(); y = 48; } };
+
+    // Title page
+    addLine("Full Solution Report", 22, true);
+    addLine(scenarioInput.scenarioTitle || "Untitled Scenario", 15, false);
+    addGap(4);
+    if (scenarioInput.industry) addLine(`Industry: ${scenarioInput.industry}`, 11, false);
+    if (scenarioInput.customerType) addLine(`Customer Type: ${scenarioInput.customerType}`, 11, false);
+    addGap(20);
+
+    // Section 1: Scenario
+    addLine("Section 1 — Scenario", 14, true);
+    addGap(4);
+    const scenarioFields: [string, string][] = [
+      ["Scenario Title", scenarioInput.scenarioTitle],
+      ["Problem Statement", scenarioInput.problemStatement],
+      ["Business Goals", scenarioInput.businessGoals],
+      ["Current State", scenarioInput.currentState],
+      ["Desired Future State", scenarioInput.desiredFutureState],
+      ["Constraints", scenarioInput.constraints],
+      ["Timeline", scenarioInput.timeline],
+    ];
+    scenarioFields.forEach(([label, value]) => {
+      if (value?.trim()) {
+        addLine(label, 11, true);
+        addLine(value, 10, false);
+        addGap(6);
+      }
+    });
+    addGap(12);
+
+    // Section 2: Discovery Q&A
+    addLine("Section 2 — Discovery Q&A", 14, true);
+    addGap(4);
+    ARCHITECT_TABS.forEach((tab) => {
+      addGap(6);
+      addLine(`${tab.id} — ${tab.description}`, 12, true);
+      addGap(4);
+      tab.questions.forEach((q) => {
+        addLine(q.question, 10, true, 8);
+        const answer = architectAnswers[q.id]?.trim() || "(no response)";
+        addLine(answer, 10, false, 8);
+        addGap(4);
+      });
+    });
+    addGap(12);
+
+    // Section 3: Story
+    if (story) {
+      addLine("Section 3 — Story", 14, true);
+      addGap(4);
+      const storyFields: [string, string][] = [
+        ["Strategy", story.strategy],
+        ["Technology", story.technology],
+        ["Outcome", story.outcome],
+        ["Return Value", story.returnValue],
+        ["Years Ahead", story.years],
+      ];
+      storyFields.forEach(([label, value]) => {
+        if (value?.trim()) {
+          addLine(label, 11, true);
+          addLine(value, 10, false);
+          addGap(6);
+        }
+      });
+      addGap(12);
+    }
+
+    // Section 4: Solution
+    addLine("Section 4 — Solution", 14, true);
+    addGap(4);
+    if (solutionNarrative?.trim()) {
+      addLine("Solution Narrative", 11, true);
+      addLine(solutionNarrative, 10, false);
+      addGap(6);
+    }
+    addLine("Note: See Design tab for architecture diagram.", 10, false);
+    addGap(6);
+    if (architecture.details?.length) {
+      addLine("Architecture Details", 11, true);
+      architecture.details.forEach((d) => {
+        addLine(d.title, 10, true, 8);
+        addLine(d.body, 10, false, 8);
+        addGap(4);
+      });
+    }
+    if (architecture.assumptions?.length) {
+      addGap(4);
+      addLine("Assumptions", 11, true);
+      architecture.assumptions.forEach((a) => {
+        addLine(`• ${a}`, 10, false, 8);
+      });
+    }
+
+    const filename = `${(scenarioInput.scenarioTitle || "report").replace(/\s+/g, "-").toLowerCase()}-full-report.pdf`;
+    doc.save(filename);
   };
 
   const renderScenarioSection = () => {
@@ -776,15 +871,15 @@ function App() {
               </div>
             )}
           </aside>
-          <div className="min-h-0 min-w-0 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden">
             <DesignCanvas
               architecture={architecture}
               onArchitectureChange={setArchitecture}
               compactNodes={compactDesignNodes}
               onToggleCompactNodes={() => setCompactDesignNodes((current) => !current)}
-              onAutoLayout={() =>
-                setArchitecture((current) => autoLayoutArchitecture(current))
-              }
+              onAutoLayout={() => setArchitecture((current) => autoLayoutArchitecture(current))}
+              onGenerateDesign={handleGenerateDesign}
+              isGeneratingDesign={isGeneratingDesign}
             />
           </div>
         </div>
@@ -792,65 +887,196 @@ function App() {
     }
 
     if (workspaceTab === "Solution") {
+      const isEditing = (id: string) => editingSections.has(id);
+      const startEdit = (id: string, value: string) => {
+        setSectionDrafts((prev) => ({ ...prev, [id]: value }));
+        setEditingSections((prev) => new Set([...prev, id]));
+      };
+      const doneEdit = (id: string, apply: (draft: string) => void) => {
+        apply(sectionDrafts[id] ?? "");
+        setEditingSections((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      };
+
       return (
-        <div className="grid min-h-0 min-w-0 gap-3 overflow-hidden p-3 xl:grid-cols-[1.15fr_0.85fr]">
-          <section className="min-h-0 overflow-y-auto rounded-[24px] border border-white/10 bg-white/8 p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-300">Editable Narrative</p>
-                <h2 className="text-base font-semibold text-white">Solution overview</h2>
-              </div>
-              <button type="button" onClick={() => copyText(solutionNarrative)} className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-slate-200">
-                <ClipboardCopy className="mr-1.5 inline h-3.5 w-3.5" />
-                Copy
-              </button>
-            </div>
-            <textarea
-              value={solutionNarrative}
-              onChange={(event) => setSolutionNarrative(event.target.value)}
-              className="min-h-[320px] w-full rounded-[20px] border border-white/10 bg-slate-950/70 p-4 text-sm leading-7 text-slate-100 outline-none"
-            />
-            <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="grid gap-4 xl:grid-cols-3 lg:grid-cols-2 grid-cols-1">
+            {/* Left column — wider, spanning 2 cols at xl */}
+            <div className="flex flex-col gap-4 xl:col-span-2">
+              <InfoPanel title="Solution Summary">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-300">Narrative</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleGenerateSolution}
+                      disabled={isGeneratingSolution}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-cyan-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-300 transition hover:bg-cyan-500/25 disabled:opacity-50"
+                    >
+                      {isGeneratingSolution ? <Activity className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      {isGeneratingSolution ? "Generating..." : "Generate"}
+                    </button>
+                    <button type="button" onClick={() => copyText(solutionNarrative)} className="rounded-full bg-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200">
+                      <ClipboardCopy className="mr-1 inline h-3 w-3" />Copy
+                    </button>
+                    {isEditing("narrative") ? (
+                      <button type="button" onClick={() => doneEdit("narrative", setSolutionNarrative)} className="rounded-full bg-cyan-500/20 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-300">Done</button>
+                    ) : (
+                      <button type="button" onClick={() => startEdit("narrative", solutionNarrative)} className="rounded-full bg-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200">Edit</button>
+                    )}
+                  </div>
+                </div>
+                {isEditing("narrative") ? (
+                  <textarea
+                    value={sectionDrafts["narrative"] ?? solutionNarrative}
+                    onChange={(e) => setSectionDrafts((prev) => ({ ...prev, narrative: e.target.value }))}
+                    rows={7}
+                    placeholder="Solution narrative..."
+                    className="w-full resize-y rounded-[18px] border border-white/10 bg-slate-950/70 p-4 text-sm leading-7 text-slate-100 outline-none"
+                  />
+                ) : (
+                  <p className="text-sm leading-7 text-slate-200 whitespace-pre-wrap">{solutionNarrative}</p>
+                )}
+                {architecture.summary && (
+                  <p className="mt-3 text-sm leading-6 text-slate-400">{architecture.summary}</p>
+                )}
+              </InfoPanel>
+
               <InfoPanel title="Architecture Details">
                 <div className="space-y-3">
-                  {architecture.details.map((detail) => (
+                  {architecture.details.map((detail, i) => (
                     <div key={detail.title} className="rounded-2xl bg-white/5 p-3">
-                      <p className="text-sm font-semibold text-white">{detail.title}</p>
-                      <p className="mt-1.5 text-sm leading-6 text-slate-300">{detail.body}</p>
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <p className="text-sm font-semibold text-white">{detail.title}</p>
+                        {isEditing(`detail_${i}`) ? (
+                          <button type="button" onClick={() => doneEdit(`detail_${i}`, (v) => setArchitecture((prev) => ({ ...prev, details: prev.details.map((d, j) => j === i ? { ...d, body: v } : d) })))} className="shrink-0 rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-300">Done</button>
+                        ) : (
+                          <button type="button" onClick={() => startEdit(`detail_${i}`, detail.body)} className="shrink-0 rounded-full bg-white/8 px-2 py-0.5 text-[10px] font-semibold text-slate-400 hover:text-slate-200">Edit</button>
+                        )}
+                      </div>
+                      {isEditing(`detail_${i}`) ? (
+                        <textarea value={sectionDrafts[`detail_${i}`] ?? detail.body} onChange={(e) => setSectionDrafts((prev) => ({ ...prev, [`detail_${i}`]: e.target.value }))} rows={3} placeholder="Detail description..." className="w-full resize-y rounded-[12px] border border-white/10 bg-slate-950/60 p-2.5 text-sm leading-6 text-slate-100 outline-none" />
+                      ) : (
+                        <p className="text-sm leading-6 text-slate-300">{detail.body}</p>
+                      )}
                     </div>
                   ))}
                 </div>
               </InfoPanel>
+
               <InfoPanel title="Assumptions">
-                <BulletList items={architecture.assumptions} dark />
+                <div className="mb-2 flex justify-end">
+                  {isEditing("assumptions") ? (
+                    <button type="button" onClick={() => doneEdit("assumptions", (v) => setArchitecture((prev) => ({ ...prev, assumptions: v.split("\n").filter(Boolean) })))} className="rounded-full bg-cyan-500/20 px-2.5 py-1 text-[11px] font-semibold text-cyan-300">Done</button>
+                  ) : (
+                    <button type="button" onClick={() => startEdit("assumptions", architecture.assumptions.join("\n"))} className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-slate-400 hover:text-slate-200">Edit</button>
+                  )}
+                </div>
+                {isEditing("assumptions") ? (
+                  <textarea value={sectionDrafts["assumptions"] ?? architecture.assumptions.join("\n")} onChange={(e) => setSectionDrafts((prev) => ({ ...prev, assumptions: e.target.value }))} rows={6} placeholder="One assumption per line" className="w-full resize-y rounded-[14px] border border-white/10 bg-slate-950/60 p-3 text-sm leading-6 text-slate-100 outline-none" />
+                ) : (
+                  <BulletList items={architecture.assumptions} dark />
+                )}
               </InfoPanel>
             </div>
-          </section>
-          <section className="min-h-0 overflow-y-auto rounded-[24px] border border-white/10 bg-white/8 p-4">
-            <div className="grid gap-3">
-              <InfoPanel title="Sponsor-ready Storyline">
-                <p className="text-sm leading-6 text-slate-300">{playbook.executiveSummary.sponsorReady}</p>
+
+            {/* Right column */}
+            <div className="flex flex-col gap-4">
+              <InfoPanel title="Recommended Engagement Approach">
+                <div className="mb-2 flex justify-end">
+                  {isEditing("approach") ? (
+                    <button type="button" onClick={() => doneEdit("approach", (v) => setPlaybook((prev) => ({ ...prev, recommendedEngagementApproach: v.split("\n").filter(Boolean) })))} className="rounded-full bg-cyan-500/20 px-2.5 py-1 text-[11px] font-semibold text-cyan-300">Done</button>
+                  ) : (
+                    <button type="button" onClick={() => startEdit("approach", playbook.recommendedEngagementApproach.join("\n"))} className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-slate-400 hover:text-slate-200">Edit</button>
+                  )}
+                </div>
+                {isEditing("approach") ? (
+                  <textarea value={sectionDrafts["approach"] ?? playbook.recommendedEngagementApproach.join("\n")} onChange={(e) => setSectionDrafts((prev) => ({ ...prev, approach: e.target.value }))} rows={5} placeholder="One item per line" className="w-full resize-y rounded-[14px] border border-white/10 bg-slate-950/60 p-3 text-sm leading-6 text-slate-100 outline-none" />
+                ) : (
+                  <BulletList items={playbook.recommendedEngagementApproach} dark />
+                )}
               </InfoPanel>
-              <InfoPanel title="Talking Points">
-                <BulletList items={playbook.whiteboardTalkTrack} dark />
-              </InfoPanel>
-              <InfoPanel title="Recommended Architecture Options">
+
+              <InfoPanel title="Architecture Options">
                 <div className="space-y-3">
                   {playbook.architectureOptions.map((option) => (
                     <div key={option.name} className="rounded-2xl bg-white/5 p-3">
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
                         <h3 className="text-sm font-semibold text-white">{option.name}</h3>
-                        <span className="rounded-full bg-emerald-500/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-300">
-                          Recommended
-                        </span>
+                        {option.idealMaturityLevel && (
+                          <span className="shrink-0 rounded-full bg-cyan-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-300">
+                            {option.idealMaturityLevel}
+                          </span>
+                        )}
                       </div>
-                      <p className="mt-1.5 text-sm leading-6 text-slate-300">{option.summary}</p>
+                      <p className="text-sm leading-6 text-slate-300">{option.summary}</p>
+                      {option.whenToUse?.length ? (
+                        <div className="mt-2">
+                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">When to use</p>
+                          <ul className="space-y-1">
+                            {option.whenToUse.map((w) => (
+                              <li key={w} className="text-xs leading-5 text-slate-400">• {w}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {option.benefits?.length ? (
+                        <div className="mt-2">
+                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Benefits</p>
+                          <ul className="space-y-1">
+                            {option.benefits.map((b) => (
+                              <li key={b} className="text-xs leading-5 text-slate-400">• {b}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
               </InfoPanel>
+
+              <InfoPanel title="Business Drivers">
+                <div className="mb-2 flex justify-end">
+                  {isEditing("drivers") ? (
+                    <button type="button" onClick={() => doneEdit("drivers", (v) => setPlaybook((prev) => ({ ...prev, businessDrivers: v.split("\n").filter(Boolean) })))} className="rounded-full bg-cyan-500/20 px-2.5 py-1 text-[11px] font-semibold text-cyan-300">Done</button>
+                  ) : (
+                    <button type="button" onClick={() => startEdit("drivers", playbook.businessDrivers.join("\n"))} className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] font-semibold text-slate-400 hover:text-slate-200">Edit</button>
+                  )}
+                </div>
+                {isEditing("drivers") ? (
+                  <textarea value={sectionDrafts["drivers"] ?? playbook.businessDrivers.join("\n")} onChange={(e) => setSectionDrafts((prev) => ({ ...prev, drivers: e.target.value }))} rows={4} placeholder="One item per line" className="w-full resize-y rounded-[14px] border border-white/10 bg-slate-950/60 p-3 text-sm leading-6 text-slate-100 outline-none" />
+                ) : (
+                  <BulletList items={playbook.businessDrivers} dark />
+                )}
+              </InfoPanel>
+
+              <InfoPanel title="Confidence Rating">
+                <div className="flex items-end gap-3">
+                  <span className="text-5xl font-bold text-white">{playbook.confidenceRating ?? "—"}</span>
+                  <span className="mb-1.5 text-sm text-slate-400">/ 10</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Overall solution confidence</p>
+              </InfoPanel>
+
+              {playbook.risks?.length ? (
+                <InfoPanel title="Key Risks">
+                  <div className="space-y-3">
+                    {playbook.risks.slice(0, 3).map((risk) => (
+                      <div key={risk.title} className="rounded-2xl bg-white/5 p-3">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-semibold text-white">{risk.title}</p>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${risk.likelihood === "High" ? "bg-rose-500/20 text-rose-300" : risk.likelihood === "Medium" ? "bg-amber-500/20 text-amber-300" : "bg-slate-500/20 text-slate-300"}`}>{risk.likelihood}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${risk.impact === "High" ? "bg-rose-500/20 text-rose-300" : risk.impact === "Medium" ? "bg-amber-500/20 text-amber-300" : "bg-slate-500/20 text-slate-300"}`}>{risk.impact} impact</span>
+                          </div>
+                        </div>
+                        <p className="text-xs leading-5 text-slate-400 line-clamp-2">{risk.mitigation}</p>
+                      </div>
+                    ))}
+                  </div>
+                </InfoPanel>
+              ) : null}
             </div>
-          </section>
+          </div>
         </div>
       );
     }
@@ -861,19 +1087,44 @@ function App() {
   return (
     <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_26%),radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_24%),linear-gradient(180deg,#020617_0%,#08111f_36%,#0f172a_100%)] text-slate-100 dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_26%),radial-gradient(circle_at_top_right,rgba(249,115,22,0.14),transparent_24%),linear-gradient(180deg,#020617_0%,#08111f_36%,#0f172a_100%)] dark:text-slate-100">
       <div className="mx-auto flex h-full max-w-[1780px] flex-col px-3 pb-3 pt-2 md:px-4">
-        <header className="sticky top-2 z-40 flex items-center justify-between gap-3 rounded-[18px] border border-white/10 bg-slate-950/72 px-3 py-1.5 shadow-[0_16px_32px_rgba(2,6,23,0.34)] backdrop-blur-xl">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.35em] text-cyan-300">
+        <header className="sticky top-2 z-40 flex items-center gap-3 rounded-[18px] border border-white/10 bg-slate-950/72 px-3 py-1.5 shadow-[0_16px_32px_rgba(2,6,23,0.34)] backdrop-blur-xl">
+          {/* Logo */}
+          <div className="shrink-0">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.35em] text-cyan-300 cursor-pointer"
+            >
               <Sparkles className="h-3.5 w-3.5" />
               SA Assistant
-            </div>
+            </button>
           </div>
-          <div className="flex min-w-0 shrink-0 items-center gap-2">
-            <label className="flex min-w-[240px] max-w-[360px] items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-slate-200">
-              <span className="shrink-0 uppercase tracking-[0.16em] text-slate-400">Scenario</span>
+
+          {/* Center tabs */}
+          <div className="flex flex-1 items-center justify-center gap-1">
+            {workspaceTabs.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setWorkspaceTab(value)}
+                className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition ${
+                  workspaceTab === value
+                    ? "bg-white text-slate-950"
+                    : "bg-white/10 text-slate-300 hover:bg-white/15"
+                }`}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+
+          {/* Right controls */}
+          <div className="flex shrink-0 items-center gap-2">
+            <label className="flex min-w-[200px] max-w-[320px] items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-slate-200">
               <select
                 value={selectedStaticScenarioId}
                 onChange={(event) => setSelectedStaticScenarioId(event.target.value)}
+                title="Select scenario"
                 className="w-full bg-transparent text-[11px] outline-none"
               >
                 {staticScenarioLibrary.map((scenario) => (
@@ -883,21 +1134,60 @@ function App() {
                 ))}
               </select>
             </label>
+
             <button
               type="button"
-              onClick={() => setNewScenarioOpen(true)}
+              onClick={() => { setWizardInitialText(""); setNewScenarioOpen(true); }}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10"
               title="Create new scenario"
             >
               <Plus className="h-4 w-4" />
             </button>
+
             <button
               type="button"
               onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10"
+              title="Toggle theme"
             >
-              {theme === "dark" ? <SunMedium className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
+              {theme === "dark" ? <SunMedium className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
+
+            {/* Actions dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setActionsOpen((o) => !o)}
+                onBlur={() => setTimeout(() => setActionsOpen(false), 150)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-semibold text-slate-200 transition hover:bg-white/10"
+              >
+                Actions
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              {actionsOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-[200px] overflow-hidden rounded-2xl border border-white/10 bg-slate-900 shadow-[0_16px_40px_rgba(2,6,23,0.5)]">
+                  {[
+                    { icon: <Save className="h-3.5 w-3.5" />, label: "Save", action: saveScenario },
+                    { icon: <FileText className="h-3.5 w-3.5" />, label: "Export Assessment", action: exportAssessmentPdf },
+                    { icon: <FileOutput className="h-3.5 w-3.5" />, label: "PDF (Playbook)", action: exportPlaybookPdf },
+                    { icon: <FileOutput className="h-3.5 w-3.5" />, label: "Full Report", action: exportFullReportPdf },
+                    { icon: <Code2 className="h-3.5 w-3.5" />, label: "Scenario JSON", action: () => setJsonEditorOpen("scenario") },
+                    { icon: <Code2 className="h-3.5 w-3.5" />, label: "Arch JSON", action: () => setJsonEditorOpen("architecture") },
+                  ].map(({ icon, label, action }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); action(); setActionsOpen(false); }}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-[12px] font-medium text-slate-200 transition hover:bg-white/8"
+                    >
+                      {icon}
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={() => {
@@ -907,42 +1197,21 @@ function App() {
               className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-3.5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
             >
               <Bot className="h-4 w-4" />
-              Generate Playbook
+              Generate
             </button>
           </div>
         </header>
 
         <main className={`${workspaceFullscreen ? "fixed inset-0 z-[52] bg-slate-950/96 p-2" : "mt-2 min-h-0 flex-1 overflow-hidden"}`}>
-          <section className="grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-[24px] border border-white/10 bg-white/5 shadow-[0_24px_54px_rgba(2,6,23,0.35)] backdrop-blur-xl">
-            <div className="flex min-h-[42px] items-center justify-between gap-2 border-b border-white/10 px-2.5 py-1.5">
-              <div className="flex min-h-[28px] min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
-                {workspaceTabs.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setWorkspaceTab(value)}
-                    className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${workspaceTab === value ? "bg-white text-slate-950" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
-              <div className="flex min-h-[28px] shrink-0 items-center gap-1.5">
-                <ActionButton icon={<Save className="h-3.5 w-3.5" />} label="Save" onClick={saveScenario} compact />
-                <ActionButton icon={<FileText className="h-3.5 w-3.5" />} label="Export Assessment" onClick={exportAssessmentPdf} compact />
-                <ActionButton icon={<FileOutput className="h-3.5 w-3.5" />} label="PDF" onClick={exportPlaybookPdf} compact />
-                <ActionButton icon={<Code2 className="h-3.5 w-3.5" />} label="Scenario JSON" onClick={() => setJsonEditorOpen("scenario")} compact />
-                <ActionButton icon={<Code2 className="h-3.5 w-3.5" />} label="Arch JSON" onClick={() => setJsonEditorOpen("architecture")} compact />
-                <button
-                  type="button"
-                  onClick={() => setWorkspaceFullscreen((current) => !current)}
-                  className="rounded-full bg-white/8 p-2 text-slate-200 transition hover:bg-white/12"
-                  title={workspaceFullscreen ? "Exit full screen" : "Full screen"}
-                >
-                  {workspaceFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+          <section className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[24px] border border-white/10 bg-white/5 shadow-[0_24px_54px_rgba(2,6,23,0.35)] backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={() => setWorkspaceFullscreen((current) => !current)}
+              className="absolute right-3 top-3 z-10 rounded-full bg-white/8 p-1.5 text-slate-200 transition hover:bg-white/12"
+              title={workspaceFullscreen ? "Exit full screen" : "Full screen"}
+            >
+              {workspaceFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </button>
             {renderWorkspaceContent()}
           </section>
         </main>
@@ -1078,15 +1347,22 @@ function App() {
                   className="min-h-[150px] w-full rounded-[24px] border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-100 outline-none"
                 />
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <p className="text-xs text-slate-400">This chat controls both architecture generation and scenario playbook updates.</p>
                   <button
                     type="button"
-                    disabled={loading || !chatDraft.trim()}
-                    onClick={() => runGeneration(chatDraft)}
+                    disabled={!chatDraft.trim()}
+                    onClick={() => { setWizardInitialText(chatDraft); setNewScenarioOpen(true); setChatOpen(false); }}
+                    className="shrink-0 rounded-full bg-white/8 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/15 disabled:opacity-40"
+                  >
+                    Use as Scenario →
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!chatDraft.trim()}
+                    onClick={() => { setWizardInitialText(chatDraft); setNewScenarioOpen(true); setChatOpen(false); }}
                     className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {loading ? <Activity className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-                    {loading ? loadingStep : "Run"}
+                    <ArrowRight className="h-4 w-4" />
+                    Run
                   </button>
                 </div>
               </div>
@@ -1115,6 +1391,7 @@ function App() {
         open={newScenarioOpen}
         onClose={() => setNewScenarioOpen(false)}
         onSave={handleSaveNewScenario}
+        initialProblemStatement={wizardInitialText}
       />
     </div>
   );

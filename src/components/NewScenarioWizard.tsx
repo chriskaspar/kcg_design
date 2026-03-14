@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Activity, ArrowLeft, ArrowRight, Check, Sparkles, X } from "lucide-react";
 import { ARCHITECT_TABS } from "../lib/architectFramework";
@@ -11,6 +11,7 @@ interface NewScenarioWizardProps {
   open: boolean;
   onClose: () => void;
   onSave: (scenario: SavedScenario) => void;
+  initialProblemStatement?: string;
 }
 
 const INPUT_TABS = ARCHITECT_TABS.filter((t) => t.id !== "STORY");
@@ -31,13 +32,29 @@ const defaultInput: ScenarioInput = {
   outputDepth: "Executive + Technical"
 };
 
-export function NewScenarioWizard({ open, onClose, onSave }: NewScenarioWizardProps) {
+export function NewScenarioWizard({ open, onClose, onSave, initialProblemStatement }: NewScenarioWizardProps) {
   const [step, setStep] = useState(0); // 0 = setup, 1..8 = ARCHITECT tabs, 9 = generate/story
   const [scenarioTitle, setScenarioTitle] = useState("");
   const [industry, setIndustry] = useState("");
   const [answers, setAnswers] = useState<ArchitectAnswers>({});
   const [story, setStory] = useState<StoryOutput | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    if (open && initialProblemStatement) {
+      const firstLine = initialProblemStatement.split("\n")[0];
+      setScenarioTitle(firstLine.length > 80 ? firstLine.slice(0, 77) + "..." : firstLine);
+      setAnswers({ why_w2: initialProblemStatement });
+      setStep(0);
+      setStory(null);
+    } else if (open && !initialProblemStatement) {
+      setStep(0);
+      setScenarioTitle("");
+      setIndustry("");
+      setAnswers({});
+      setStory(null);
+    }
+  }, [open, initialProblemStatement]);
 
   const TOTAL_STEPS = INPUT_TABS.length + 2; // setup + 8 tabs + story
   const isSetup = step === 0;

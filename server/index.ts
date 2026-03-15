@@ -63,7 +63,11 @@ app.post("/api/studio/generate", async (request, response) => {
   }
 
   if (!openai) {
-    response.json(payload.mockResponse);
+    if (payload.mockResponse !== undefined) {
+      response.json(payload.mockResponse);
+    } else {
+      response.status(503).json({ error: "No OpenAI API key configured. Add OPENAI_API_KEY to your .env to enable generation." });
+    }
     return;
   }
 
@@ -82,6 +86,7 @@ app.post("/api/studio/generate", async (request, response) => {
     openAIContext.currentStory = payload.currentStory;
   }
 
+  console.log(`[generate] intent=${payload.intent} model=${model}`);
   try {
     const result = await openai.responses.parse({
       model,
@@ -98,20 +103,16 @@ app.post("/api/studio/generate", async (request, response) => {
       text: { format: zodTextFormat(studioResponseSchema, "studio_response") }
     });
 
+    console.log(`[generate] success intent=${payload.intent}`);
     response.json(result.output_parsed);
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[generate] error intent=${payload.intent}:`, msg);
     if (error instanceof OpenAI.APIError && (error.status === 429 || error.code === "insufficient_quota")) {
-      response.json({
-        ...(payload.mockResponse as Record<string, unknown>),
-        assistantMessage: "OpenAI quota is unavailable right now, so the studio used mock data. Update billing or quota when ready and retry for live generation."
-      });
+      response.status(429).json({ error: "OpenAI quota exceeded. Check your billing at platform.openai.com." });
       return;
     }
-    console.error(error);
-    response.status(500).json({
-      ...(payload.mockResponse as Record<string, unknown>),
-      assistantMessage: "OpenAI generation failed, so the studio returned mock content instead."
-    });
+    response.status(500).json({ error: msg });
   }
 });
 

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Activity, ArrowLeft, ArrowRight, Check, Sparkles, X } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, Check, ChevronDown, Sparkles, Terminal, X } from "lucide-react";
 import { ARCHITECT_TABS } from "../lib/architectFramework";
 import { ArchitectTab } from "./ArchitectTab";
 import type { ArchitectAnswers, StoryOutput } from "../types/architect";
@@ -55,6 +55,9 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
   const [story, setStory] = useState<StoryOutput | null>(null);
   const [generatedScenario, setGeneratedScenario] = useState<{ architecture: ArchitectureSpec; playbook: ScenarioPlaybook } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [genLogs, setGenLogs] = useState<{ msg: string; ok: boolean }[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -94,8 +97,46 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
+  const buildScenario = (
+    freshArchitecture: ArchitectureSpec,
+    freshPlaybook: ScenarioPlaybook,
+    freshStory: StoryOutput | null
+  ): SavedScenario => {
+    const title = scenarioTitle || "New Scenario";
+    const input: ScenarioInput = {
+      ...defaultInput,
+      scenarioTitle: title,
+      industry,
+      problemStatement: answers["why_w2"] || "",
+      businessGoals: answers["why_w3"] || "",
+      constraints: answers["goal_l1"] || "",
+      timeline: answers["goal_l2"] || "12 months",
+      currentState: answers["flow_f1"] || "",
+      desiredFutureState: answers["win_n1"] || "",
+      stakeholders: answers["why_h1"] || "",
+    };
+    return {
+      id: crypto.randomUUID(),
+      title,
+      input,
+      architecture: normalizeArchitecture(freshArchitecture),
+      playbook: freshPlaybook,
+      architectAnswers: answers,
+      story: freshStory ?? undefined,
+      updatedAt: new Date().toISOString()
+    };
+  };
+
+  const pushLog = (msg: string, ok = true) => {
+    const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
+    setGenLogs((prev) => [...prev, { msg: `[${ts}] ${msg}`, ok }]);
+    if (logEndRef.current) logEndRef.current.scrollIntoView({ behavior: "smooth" });
+  };
+
   const handleGenerate = async () => {
     setIsGenerating(true);
+    setGenLogs([]);
+    setShowLogs(false);
     const scenarioInput: ScenarioInput = {
       scenarioTitle: scenarioTitle || "New Scenario",
       industry,
@@ -112,9 +153,13 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
       outputDepth: "Comprehensive"
     };
     try {
+      const intent = isUpdateMode && currentContent ? "generateDesign" : "generateNew";
+      pushLog(`Intent: ${intent} · ${answeredCount} questions answered`);
+      pushLog("Sending request to OpenAI API...");
+
       const body = isUpdateMode && currentContent
         ? {
-            intent: "generateDesign",
+            intent,
             scenarioInput,
             architectAnswers: answers,
             currentArchitecture: { ...currentContent.architecture, solutionOverview: currentContent.solutionNarrative },
@@ -122,20 +167,33 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
             currentSolutionNarrative: currentContent.solutionNarrative,
             currentStory: currentContent.story
           }
-        : { intent: "generateNew", scenarioInput, architectAnswers: answers };
+        : { intent, scenarioInput, architectAnswers: answers };
 
       const res = await fetch("/api/studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
       });
-      if (res.ok) {
-        const data = await res.json() as { architecture: ArchitectureSpec; playbook: ScenarioPlaybook; story: StoryOutput | null };
-        setGeneratedScenario({ architecture: normalizeArchitecture(data.architecture), playbook: data.playbook });
-        if (data.story) setStory(data.story);
+
+      pushLog(`Server responded: HTTP ${res.status}`, res.ok);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? `Server error ${res.status}`);
       }
-    } catch {
-      // Keep existing story on error (update mode) or set minimal fallback (new mode)
+
+      pushLog("Parsing generated JSON...");
+      const data = await res.json() as { architecture: ArchitectureSpec; playbook: ScenarioPlaybook; story: StoryOutput | null };
+      pushLog(`Architecture nodes: ${data.architecture?.nodes?.length ?? 0} · Story: ${data.story ? "yes" : "no"}`);
+      pushLog("Saving scenario and opening workspace...");
+
+      const scenario = buildScenario(data.architecture, data.playbook, data.story ?? null);
+      onSave(scenario);
+      onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      pushLog(`Error: ${msg}`, false);
+      setShowLogs(true);
       if (!isUpdateMode) {
         const win1 = answers["win_n1"] || answers["win_w1"] || "Enable new capabilities and improved insights";
         setStory({
@@ -272,7 +330,7 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
                 ))}
               </div>
               <span className="text-xs text-slate-500">{answeredCount} / {allQuestionIds.length} answered</span>
-              <button type="button" onClick={onClose} className="rounded-full bg-white/8 p-2 text-slate-400 hover:bg-white/12">
+              <button type="button" onClick={onClose} title="Close" className="rounded-full bg-white/8 p-2 text-slate-400 hover:bg-white/12">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -355,15 +413,46 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleGenerate}
-                      disabled={isGenerating || (!isUpdateMode && answeredCount === 0)}
-                      className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-50"
-                    >
-                      {isGenerating ? <Activity className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                      {isGenerating ? "Generating..." : isUpdateMode ? "Regenerate Solution, Design & Story" : "Create Solution, Design & Story"}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleGenerate}
+                        disabled={isGenerating || (!isUpdateMode && answeredCount === 0)}
+                        className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-50"
+                      >
+                        {isGenerating ? <Activity className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        {isGenerating ? "Generating..." : isUpdateMode ? "Regenerate Solution, Design & Story" : "Create Solution, Design & Story"}
+                      </button>
+                      {genLogs.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowLogs((v) => !v)}
+                          title="View generation log"
+                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition ${
+                            genLogs.some((l) => !l.ok)
+                              ? "bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                              : "bg-white/10 text-slate-400 hover:bg-white/15 hover:text-slate-200"
+                          }`}
+                        >
+                          <Terminal className="h-3.5 w-3.5" />
+                          Logs
+                          <ChevronDown className={`h-3 w-3 transition-transform ${showLogs ? "rotate-180" : ""}`} />
+                        </button>
+                      )}
+                    </div>
+
+                    {showLogs && genLogs.length > 0 && (
+                      <div className="rounded-[16px] border border-white/10 bg-slate-950/80 p-4 font-mono">
+                        <div className="max-h-48 overflow-y-auto space-y-1">
+                          {genLogs.map((entry, i) => (
+                            <p key={i} className={`text-[11px] leading-5 ${entry.ok ? "text-slate-400" : "text-red-400"}`}>
+                              {entry.msg}
+                            </p>
+                          ))}
+                          <div ref={logEndRef} />
+                        </div>
+                      </div>
+                    )}
                     {!isUpdateMode && story && (
                       <div className="space-y-4">
                         {(["strategy", "technology", "outcome", "returnValue", "years"] as const).map((field) => {
@@ -375,6 +464,8 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
                                 value={story[field]}
                                 onChange={(e) => setStory((prev) => prev ? { ...prev, [field]: e.target.value } : prev)}
                                 rows={3}
+                                title={labels[field]}
+                                placeholder={`Enter ${labels[field].toLowerCase()}...`}
                                 className="w-full resize-y rounded-[12px] border border-white/10 bg-slate-950/60 p-3 text-sm leading-6 text-slate-100 outline-none focus:border-cyan-500/50"
                               />
                             </div>

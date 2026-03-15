@@ -1,0 +1,1090 @@
+{
+    "id": "health-system-disease-progression",
+    "title": "Health System Disease Progression",
+    "input": {
+      "scenarioTitle": "disease progression",
+      "industry": "",
+      "customerType": "",
+      "problemStatement": "Understand patient health status and disease progression with DICOM data\nMedical images including CT, X-ray, PET, ultrasound, mammogram and MRI are essential to many diagnostic and treatment processes in healthcare, ranging from orthopedics to oncology to obstetrics. With Databricks Lakehouse for Healthcare and Life Sciences, data teams can:\n\nIngest and catalog metadata for all your DICOM images\n\nAnalyze file and image header metadata\n\nView thumbnails and image samples",
+      "businessGoals": "",
+      "constraints": "",
+      "timeline": "12 months",
+      "currentState": "",
+      "desiredFutureState": "",
+      "stakeholders": "",
+      "compliance": [],
+      "architecturePreference": "Databricks",
+      "outputDepth": "Executive + Technical"
+    },
+    "playbook": {
+      "scenarioTitle": "disease progression",
+      "scenarioSummary": "Build a Databricks Lakehouse platform to ingest and index DICOM imaging, produce thumbnails and metadata-driven search, and enable ML-based disease progression scoring to support clinical decision-making and research.",
+      "businessDrivers": [
+        "Reduce time to find and compare prior imaging studies across the enterprise.",
+        "Provide clinicians with longitudinal disease progression scores to inform treatment decisions.",
+        "Accelerate research and cohort discovery for oncology and other disease areas.",
+        "Minimize risk and ensure compliance for PHI through governed data and model workflows.",
+        "Improve operational efficiency by automating repetitive image processing tasks."
+      ],
+      "constraints": [
+        "Healthcare regulatory requirements for PHI (HIPAA/GDPR where applicable) must be met.",
+        "12-month delivery timeline with staged rollouts (pilot → production).",
+        "Network connectivity and firewall/VPN constraints between on-prem PACS and cloud.",
+        "Budget for Databricks licensing, object storage, and engineering resources must be agreed.",
+        "Clinical validation and change management cycles may extend timelines for final adoption."
+      ],
+      "recommendedEngagementApproach": [
+        "Discovery: collect sample DICOM sets, PACS details, EHR linking strategy, and compliance requirements.",
+        "Design workshop: map clinical workflows (viewer, dashboard, model usage) and define MVP scope.",
+        "Proof-of-Concept (6-8 weeks): implement metadata-first ingest, thumbnails, and a small feature extraction pipeline.",
+        "Pilot: validate with one department (e.g., oncology) including clinician feedback and retrospective model validation.",
+        "Production hardening: implement governance (Unity Catalog patterns), monitoring, and SLA for serving.",
+        "Rollout & adoption: train clinicians, integrate into workflows, and schedule post-launch model monitoring."
+      ],
+      "confidenceRating": 8,
+      "recommendedConversationPath": [
+        "Confirm the clinical use-cases: who will use progression scores and how they influence decisions.",
+        "Ask for sample data and PACS connectivity details to scope ingest complexity.",
+        "Discuss compliance requirements and de-identification strategy before moving data.",
+        "Present metadata-first MVP to align on quick wins and pilot success criteria.",
+        "Agree on success metrics for the 12-month roadmap (time-to-insight, model accuracy, adoption)."
+      ],
+      "discoveryQuestions": [
+        {
+          "category": "Data & Sources",
+          "question": "Which PACS vendors and modalities (CT, MRI, X-ray, PET, ultrasound) are in scope and how are they accessed?",
+          "whyItMatters": "Different PACS expose different protocols/APIs and image sizes which affect ingest design and throughput.",
+          "goodSignal": "PACS supports DICOMweb or has documented C-MOVE/C-STORE endpoints and engineering contact.",
+          "redFlag": "Proprietary or legacy systems with no standard DICOM interfaces or no network access."
+        },
+        {
+          "category": "Data & Sources",
+          "question": "What is the expected daily and peak volume of DICOM files and average file sizes?",
+          "whyItMatters": "Sizing storage, compute, and pipeline concurrency depends on volume and size characteristics.",
+          "goodSignal": "Estimated TB/day or number of studies provided.",
+          "redFlag": "No estimate and many unknown imaging sites across the enterprise."
+        },
+        {
+          "category": "Compliance & Security",
+          "question": "What specific regulatory controls (HIPAA, GDPR) and data residency requirements apply?",
+          "whyItMatters": "Governance architecture and network design must enforce encryption, residency, and audit requirements.",
+          "goodSignal": "Security/compliance team available with policy docs and DPO contact.",
+          "redFlag": "Unclear regulatory constraints or unwillingness to share compliance requirements."
+        },
+        {
+          "category": "Clinical Workflow",
+          "question": "How should progression scores be consumed — embedded in PACS viewer, separate dashboard, or EHR?",
+          "whyItMatters": "Integration points determine latency, APIs, and certification/validation requirements.",
+          "goodSignal": "Clear target application (viewer or EHR) and integration owner identified.",
+          "redFlag": "No defined consuming workflow — prevents validating user value."
+        },
+        {
+          "category": "Data Quality",
+          "question": "Are DICOM header fields standardized across sites (patient IDs, study date, laterality) or are mappings required?",
+          "whyItMatters": "Data normalization is required for correct patient linkage and longitudinal analysis.",
+          "goodSignal": "Consistent header usage and sample files show expected fields.",
+          "redFlag": "Missing identifiers or inconsistent use of tags across modalities."
+        },
+        {
+          "category": "ML & Validation",
+          "question": "Do you have labeled cohorts or annotated studies for retrospective model training and validation?",
+          "whyItMatters": "Model training needs labeled outcomes; lack of labels increases validation effort and timeline.",
+          "goodSignal": "Curated labels or registries exist for target disease progression endpoints.",
+          "redFlag": "No labels and no clinical annotation capacity planned."
+        },
+        {
+          "category": "Ops & Integration",
+          "question": "What SLAs are required for inference (real-time vs batch) and who will operate the service?",
+          "whyItMatters": "Serving architecture and monitoring depend on performance and ownership.",
+          "goodSignal": "Target latency defined and a team assigned to operate the service.",
+          "redFlag": "Undefined SLAs and no operations owner."
+        },
+        {
+          "category": "Security",
+          "question": "Do you require de-identification before images leave on-prem, or can de-identification happen in cloud?",
+          "whyItMatters": "Impacts data flow, legal approvals, and architecture (edge de-id vs cloud-based de-id).",
+          "goodSignal": "Policy allows secure transfer to cloud with encryption and access controls.",
+          "redFlag": "Strict policies requiring no PHI movement without advanced approvals."
+        },
+        {
+          "category": "Budget & Procurement",
+          "question": "Is Databricks already licensed or is procurement required? What is the budget window?",
+          "whyItMatters": "Influences option selection (metadata-only vs full Lakehouse) and timeline.",
+          "goodSignal": "License in place or procurement in progress with clear budget.",
+          "redFlag": "No budget allocated and procurement takes months without contingency."
+        },
+        {
+          "category": "Clinical Adoption",
+          "question": "Which clinical stakeholders will validate progression outputs and sign-off on model use?",
+          "whyItMatters": "Clinical validation and change management must be planned early to ensure adoption.",
+          "goodSignal": "Identified clinical champions (radiologist/oncologist) willing to co-design evaluation.",
+          "redFlag": "No clinician involvement planned until after model delivery."
+        }
+      ],
+      "problemFraming": {
+        "statement": "Clinical teams need reliable, auditable access to imaging metadata, quick visual previews, and longitudinal disease progression insights derived from DICOM images to support diagnosis and treatment decisions.",
+        "desiredOutcomes": [
+          "Indexed catalog of all imaging studies searchable by patient, date and findings.",
+          "Thumbnail previews available in clinician workflows for rapid chart review.",
+          "Validated progression scoring models that quantify change across serial studies.",
+          "Governed platform meeting PHI compliance with lineage and audit for each result."
+        ],
+        "assumptions": [
+          "Databricks licensing will be available for core platform features.",
+          "Sufficient historical imaging data exists to support model training/validation.",
+          "Network connectivity to PACS can be established for ingest."
+        ],
+        "nonNegotiables": [
+          "PHI must be protected with encryption and access controls at-rest and in-transit.",
+          "Model outputs used clinically require documented validation and clinician sign-off."
+        ],
+        "unknowns": [
+          "Exact daily ingestion volume and image size distribution.",
+          "Availability and format of labeled training data for target disease progression.",
+          "Which consumer applications require real-time vs batch scoring."
+        ],
+        "framingStatement": "Start with metadata-first ingest and thumbnails to prove value quickly, then iterate to add feature extraction and validated progression models under a governed Databricks Lakehouse."
+      },
+      "architectureOptions": [
+        {
+          "name": "Metadata-First (Minimal)",
+          "summary": "Index DICOM metadata and deliver thumbnails quickly to clinicians with minimal ML.",
+          "whenToUse": [
+            "Need fast wins and pilot adoption",
+            "Lower initial budget or immature ML readiness"
+          ],
+          "benefits": [
+            "Short time-to-value",
+            "Simpler compliance scope",
+            "Lower cost baseline"
+          ],
+          "tradeoffs": [
+            "No automated progression insights initially",
+            "Limited research capability"
+          ],
+          "idealMaturityLevel": "Early",
+          "platformMapping": [
+            "Databricks for metadata pipelines",
+            "Object storage for raw and thumbnails"
+          ],
+          "components": [
+            {
+              "layer": "Ingestion",
+              "items": [
+                "DICOM Ingest",
+                "DLT pipelines"
+              ]
+            },
+            {
+              "layer": "Storage",
+              "items": [
+                "Raw Image Lake",
+                "Indexed Metadata"
+              ]
+            },
+            {
+              "layer": "Consumers",
+              "items": [
+                "Viewer and Dashboards"
+              ]
+            }
+          ],
+          "talkTrack": [
+            "Implement metadata-first to unlock immediate search and thumbnails and de-risk later ML investments."
+          ]
+        },
+        {
+          "name": "Databricks Lakehouse (Standard)",
+          "summary": "Full Lakehouse with regulated ML lifecycle, feature tables, and serving.",
+          "whenToUse": [
+            "Production ML deployment required",
+            "Governance and lineage are priorities"
+          ],
+          "benefits": [
+            "Unified data+ML platform",
+            "Strong governance and auditability"
+          ],
+          "tradeoffs": [
+            "Higher initial effort and cost"
+          ],
+          "idealMaturityLevel": "Medium",
+          "platformMapping": [
+            "Databricks DLT, Delta, ML",
+            "Object Storage"
+          ],
+          "components": [
+            {
+              "layer": "Processing & ML",
+              "items": [
+                "Preprocessing",
+                "Feature extraction",
+                "Training & Model Registry",
+                "Serving"
+              ]
+            }
+          ],
+          "talkTrack": [
+            "This option balances clinician needs with the rigor required to use model outputs in care."
+          ]
+        },
+        {
+          "name": "Advanced AI & Federated",
+          "summary": "Federated learning plus edge inference for multi-site privacy-preserving training and low-latency scoring.",
+          "whenToUse": [
+            "Multi-site privacy requirements",
+            "Low-latency inference needs"
+          ],
+          "benefits": [
+            "Data privacy without centralizing PHI",
+            "Performance near clinical systems"
+          ],
+          "tradeoffs": [
+            "High complexity and longer timeline"
+          ],
+          "idealMaturityLevel": "Advanced",
+          "platformMapping": [
+            "Databricks central orchestration",
+            "Edge inference runtimes"
+          ],
+          "components": [
+            {
+              "layer": "Edge / Federation",
+              "items": [
+                "On-prem inference",
+                "Federated training coordinator"
+              ]
+            }
+          ],
+          "talkTrack": [
+            "Consider only for regulated, multi-site enterprises where PHI centralization is restricted."
+          ]
+        }
+      ],
+      "mockInterview": [
+        {
+          "speaker": "Interviewer",
+          "text": "Tell me about the primary clinical problem you want to solve with imaging."
+        },
+        {
+          "speaker": "Customer",
+          "text": "We need to understand if patients' tumors are progressing between imaging studies and provide radiologists/oncologists a quick score and timeline."
+        },
+        {
+          "speaker": "Solution Architect",
+          "text": "Great — we'll start with a metadata-first ingest to index studies and provide thumbnails quickly, then add feature extraction and a validated progression model for pilot clinical use."
+        },
+        {
+          "speaker": "Interviewer",
+          "text": "Do you have labeled cases or cohorts to train and validate models?"
+        },
+        {
+          "speaker": "Customer",
+          "text": "We have some historical cohorts for oncology but labels are inconsistent; we'll need support for curation and annotation."
+        },
+        {
+          "speaker": "Solution Architect",
+          "text": "We can run a retrospective labeling exercise with clinicians during the pilot and set up pipelines to capture annotations in Delta tables for model training."
+        },
+        {
+          "speaker": "Interviewer",
+          "text": "What compliance constraints should we anticipate?"
+        },
+        {
+          "speaker": "Customer",
+          "text": "HIPAA and local patient-consent rules; some sites require de-identification before outbound transfer."
+        },
+        {
+          "speaker": "Solution Architect",
+          "text": "Plan a hybrid approach: de-identify at edge for restricted sites, otherwise secure transfer to cloud with encryption and ensure Unity Catalog controls over PHI."
+        }
+      ],
+      "customerQuestions": [
+        {
+          "question": "How will you ensure patient privacy and HIPAA compliance when moving images to the cloud?",
+          "bestAnswer": "We will implement end-to-end encryption in transit and at rest, enforce role-based access via Unity Catalog, maintain audit logs for every access, and, where required, perform de-identification at edge before transfer; we will work with your compliance team to document controls and perform a security review.",
+          "notes": "Emphasize specific controls and willingness to meet with their security/compliance stakeholders.",
+          "weakAnswer": "null",
+          "strongAnswer": "null"
+        },
+        {
+          "question": "How do you validate that a progression model is clinically safe to use?",
+          "bestAnswer": "We follow a clinical validation plan: retrospective validation on held-out cohorts, prospective pilot with clinician review, performance thresholds (sensitivity/specificity) defined with clinicians, and ongoing monitoring for drift; model lineage and datasets are recorded in the registry for reproducibility.",
+          "notes": "Tie the answer to measurable thresholds and clinician sign-off processes.",
+          "weakAnswer": "null",
+          "strongAnswer": "null"
+        },
+        {
+          "question": "Can this integrate into our existing PACS viewer and EHR?",
+          "bestAnswer": "Yes — thumbnails and metadata queries are exposed via REST/JDBC and model scores via secure REST APIs; we will work with your PACS/EHR vendors to embed the workflow or launch links from the viewer.",
+          "notes": "Be ready to discuss specific integration points and previous integration examples.",
+          "weakAnswer": "null",
+          "strongAnswer": "null"
+        },
+        {
+          "question": "What ROI can we expect and in what timeframe?",
+          "bestAnswer": "Initial ROI comes from faster chart review and cohort discovery; expect measurable clinician time savings and faster research cycles within 6–12 months post-pilot. Quantifiable ROI includes reduced time to retrieve prior studies, fewer duplicated scans, and improved trial cohort identification.",
+          "notes": "Quantify with example metrics (minutes saved per review, reduction in duplicate imaging).",
+          "weakAnswer": "null",
+          "strongAnswer": "null"
+        }
+      ],
+      "risks": [
+        {
+          "title": "Data Quality & Consistency",
+          "description": "Inconsistent DICOM headers or missing identifiers can break longitudinal linking and model training.",
+          "likelihood": "High",
+          "impact": "High",
+          "mitigation": "Define normalization rules in ingestion, require sample files during discovery, and implement validation checks and remediation workflows."
+        },
+        {
+          "title": "Compliance & PHI Exposure",
+          "description": "Improper handling of PHI during ingest or access could violate regulations.",
+          "likelihood": "Medium",
+          "impact": "High",
+          "mitigation": "Enforce encryption, RBAC, audit logging, and perform security reviews; implement edge de-identification where required."
+        },
+        {
+          "title": "Model Validation & Clinical Acceptance",
+          "description": "Models may not meet clinical thresholds or may be mistrusted by clinicians.",
+          "likelihood": "Medium",
+          "impact": "High",
+          "mitigation": "Involve clinicians in labeling and evaluation, define acceptance criteria up front, and run prospective pilots with feedback loops."
+        },
+        {
+          "title": "Operational Cost & Performance",
+          "description": "Large imaging volumes can drive storage and compute costs and impact latency.",
+          "likelihood": "Medium",
+          "impact": "Medium",
+          "mitigation": "Right-size storage tiers, implement lifecycle policies, use Delta partitioning, and benchmark pipelines during the POC."
+        }
+      ],
+      "deliverables": [
+        {
+          "name": "Solution Design & Architecture Document",
+          "purpose": "Doc that captures architecture, integration points, security controls, and implementation plan for approval.",
+          "outline": [
+            "Current state and goals",
+            "Logical and physical architecture diagrams",
+            "Data flows and integration points",
+            "Security, compliance and governance controls",
+            "Roadmap and milestones"
+          ]
+        },
+        {
+          "name": "POC Plan & Pilot Dataset",
+          "purpose": "A focused plan to execute the metadata-first POC with success criteria and sample datasets.",
+          "outline": [
+            "POC scope and objectives",
+            "Datasets and access plan",
+            "Pipeline tasks and owners",
+            "Acceptance criteria and evaluation plan",
+            "Timeline (6-8 weeks)"
+          ]
+        },
+        {
+          "name": "Implementation Roadmap & Runbook",
+          "purpose": "Detailed steps for production rollout, operations, monitoring, and clinician onboarding.",
+          "outline": [
+            "Release phases and timelines",
+            "Operational runbooks (ingest, monitoring, rollback)",
+            "Governance and compliance checklist",
+            "Training and adoption plan"
+          ]
+        }
+      ],
+      "executiveSummary": {
+        "sponsorReady": "Deploy a governed Databricks Lakehouse to index imaging, enable thumbnails and validated progression scoring to improve clinical decision-making while protecting PHI.",
+        "thirtySecond": "We will build a Databricks-based imaging platform that ingests DICOMs, extracts searchable metadata and thumbnails, and iteratively adds validated ML models to quantify disease progression — delivering faster clinician workflows and research value within 12 months.",
+        "twoMinute": "Imaging is core to many clinical pathways but is often siloed and hard to search. Our approach begins by indexing every DICOM study and generating thumbnails so clinicians can quickly find and compare priors. Parallel data engineering builds feature tables and training pipelines in Databricks, leading to validated progression models registered and served with full lineage and governance. This reduces time-to-insight, enables research cohort discovery, and provides auditable ML outputs tied to clinical validation. We deliver value in phases: metadata-first POC in 6–8 weeks, pilot with a clinical group in 3–6 months, and production in 9–12 months.",
+        "successIn12Months": [
+          "Indexed catalog of imaging studies with thumbnails for at least one clinical domain (e.g., oncology).",
+          "A validated progression model in pilot use with documented clinician acceptance criteria.",
+          "Governance and access controls implemented with audit logging and baseline monitoring."
+        ]
+      },
+      "meetingChecklist": [
+        "Obtain 10–50 sample DICOM studies (varied modalities) for discovery.",
+        "List of PACS vendors, endpoints, and network contact for each site.",
+        "Security and compliance contacts and any data protection policies.",
+        "Identify clinical champions (radiologist/oncologist) and research users.",
+        "Confirm Databricks licensing status and cloud provider for object storage.",
+        "Access to sample EHR patient mapping or identifiers for linking tests.",
+        "Define initial success criteria for the POC (e.g., time to find prior study, model AUC).",
+        "Schedule a technical deep-dive with IT to discuss network and firewall needs."
+      ],
+      "nextSteps": [
+        "Schedule discovery call and request sample DICOM datasets and PACS details.",
+        "Run a small metadata-first POC (6–8 weeks) ingesting sample studies and producing thumbnails.",
+        "Set up security review and data flow approvals with the compliance team.",
+        "Identify pilot clinical unit and agree on evaluation criteria and timelines.",
+        "Prepare procurement plan for Databricks licensing and storage costs if required.",
+        "Plan clinician workshops for annotation and validation during the pilot."
+      ],
+      "whiteboardTalkTrack": [
+        "Start with the left: show where images live today (PACS, devices) and why accessing priors is hard.",
+        "Draw the ingest path: DICOM Ingest -> Object Landing Zone and emphasize secure transfer & events.",
+        "Show metadata extraction into Delta tables for fast search and link to thumbnails for quick clinician preview.",
+        "Illustrate processing: preprocessing -> feature extraction -> training -> model registry -> serving.",
+        "Cover governance: Unity Catalog, RBAC, and audit paths ensuring PHI protection and lineage.",
+        "End with consumers: radiology viewer, clinician dashboard, and research notebooks and how they use outputs."
+      ],
+      "workshopPlan": [
+        "Introductions and objectives (15 min): align on clinical problems and success metrics.",
+        "Current state deep-dive (30 min): review PACS, EHR linkage, and sample data.",
+        "Data access & security (30 min): discuss compliance and de-identification needs.",
+        "Technical architecture walkthrough (45 min): present Lakehouse pattern and integration points.",
+        "POC scoping exercise (30 min): agree on datasets, timelines and owners.",
+        "Clinical validation plan (30 min): define labeling, evaluation metrics, and sign-off criteria.",
+        "Operations & rollout planning (20 min): monitoring, support, and change management.",
+        "Q&A and next steps (10 min)."
+      ],
+      "objections": [
+        {
+          "objection": "This sounds expensive — we don't have budget for Databricks and large storage.",
+          "response": "Start with a metadata-first POC which minimizes storage and compute; we can right-size the environment for the pilot and produce a clear ROI case to justify larger investment."
+        },
+        {
+          "objection": "We can't risk moving PHI to the cloud.",
+          "response": "We can run de-identification at edge before transfer or implement strict encryption and access controls; we will also involve your security/compliance team to validate controls and create an audited data flow."
+        },
+        {
+          "objection": "Clinicians won't trust model outputs.",
+          "response": "We embed clinicians in labeling and validation, set explicit performance thresholds, and surface model explanations and confidence intervals in the viewer so decisions remain clinician-led."
+        },
+        {
+          "objection": "Integration with PACS/EHR will be too slow and complex.",
+          "response": "We focus first on metadata and thumbnails (low-friction integrations) and then design targeted APIs for the viewer/EHR; we'll work with vendors to reuse standard interfaces (DICOMweb, FHIR)."
+        }
+      ]
+    },
+    "architecture": {
+      "title": "Databricks Lakehouse for DICOM-based Disease Progression",
+      "summary": "A Databricks Lakehouse architecture to ingest, index, and analyze DICOM medical imaging to enable clinical insights into disease progression while maintaining healthcare-grade governance and compliance.",
+      "solutionOverview": "Clinical teams need a repeatable platform to ingest DICOM images (CT, MRI, X-ray, PET, ultrasound, mammogram), extract and index file/header metadata, generate thumbnails, and run analytics and ML to track disease progression. This solution uses Databricks Lakehouse as the core processing and governance plane with object storage for raw image persistence, extraction pipelines to populate Delta tables, and model pipelines for feature extraction and progression scoring. The architecture balances rapid discovery (thumbnails, metadata queries) with a production-grade path for validated models, lineage, and access controls to meet healthcare compliance requirements.",
+      "assumptions": [
+        "Primary imaging sources expose DICOM transfer (PACS C-MOVE/C-STORE) or DICOMweb endpoints.",
+        "Customer has or will procure Databricks Lakehouse licensing and an object store (S3/GCS/Azure Blob).",
+        "Daily DICOM ingestion volume is moderate (tens to low hundreds of TB/month); may require scaling if higher.",
+        "Clinical metadata (patient ID, study date, accession) is available and can be linked to EHR identifiers.",
+        "Model validation and clinical adoption require retrospective labeled cohorts and clinician review.",
+        "Network connectivity and secure peering/VPN between PACS and cloud environment can be established.",
+        "HIPAA-equivalent controls (encryption at rest/in transit, RBAC, audit logs) are required and assumed available."
+      ],
+      "details": [
+        {
+          "title": "Ingestion Layer",
+          "body": "DICOM images are pulled from PACS or device endpoints into a secure file landing area in object storage using a DICOM-aware ingest service. Ingest supports DICOMweb and C-STORE/C-MOVE and emits events to trigger metadata extraction and thumbnail generation."
+        },
+        {
+          "title": "Metadata Extraction & Indexing",
+          "body": "Automated pipelines parse DICOM headers and file metadata (Patient, Study, Series, SOP) and write normalized records into Delta tables and a metadata index DB to enable fast search and analytics without scanning raw files."
+        },
+        {
+          "title": "Image Processing & Feature Extraction",
+          "body": "Databricks notebooks and ML jobs perform preprocessing, thumbnail generation, and feature extraction (radiomics, deep embeddings) stored as feature tables consumed by downstream progression models and analytics."
+        },
+        {
+          "title": "Model Training, Registry & Serving",
+          "body": "Model training runs in Databricks ML with registered models tracked in a registry. Production scoring is exposed via a serving endpoint or batch inference pipeline that writes progression scores to Delta tables for clinician review."
+        },
+        {
+          "title": "Governance, Security & Compliance",
+          "body": "Unity Catalog-style governance, access controls, encryption, and auditability protect PHI and ensure only authorized roles access images, metadata, and models. Lineage tracks transformations for clinical validation and audits."
+        },
+        {
+          "title": "Consumer Applications",
+          "body": "Radiology viewers, clinician dashboards, and research notebooks consume indexed metadata, thumbnails, and model outputs via SQL APIs, REST services, or direct Delta queries to support diagnosis and longitudinal disease tracking."
+        }
+      ],
+      "nodes": [
+        {
+          "id": "n_sources_pacs",
+          "label": "PACS (DICOM)",
+          "iconId": "source-imaging",
+          "vendor": "generic",
+          "notes": "Primary on-prem or vendor PACS storing DICOM studies and series.",
+          "x": 80,
+          "y": 60,
+          "lane": "",
+          "metadata": {
+            "group": "Data Sources"
+          }
+        },
+        {
+          "id": "n_sources_devices",
+          "label": "Imaging Devices",
+          "iconId": "source-connected-devices",
+          "vendor": "generic",
+          "notes": "Modalities (CT, MRI, X-ray, PET, ultrasound) that produce DICOM files.",
+          "x": 80,
+          "y": 200,
+          "lane": "",
+          "metadata": {
+            "group": "Data Sources"
+          }
+        },
+        {
+          "id": "n_sources_ehr",
+          "label": "Clinical/EHR Systems",
+          "iconId": "source-operational-db",
+          "vendor": "generic",
+          "notes": "EHRs and clinical systems that provide patient identifiers and clinical context for imaging.",
+          "x": 80,
+          "y": 340,
+          "lane": "",
+          "metadata": {
+            "group": "Data Sources"
+          }
+        },
+        {
+          "id": "n_ingest_service",
+          "label": "DICOM Ingest Service",
+          "iconId": "databricks-data-ingestion",
+          "vendor": "databricks",
+          "notes": "DICOM-aware service that receives/pulls images and writes raw files to object storage while emitting events.",
+          "x": 400,
+          "y": 60,
+          "lane": "",
+          "metadata": {
+            "group": "Ingestion"
+          }
+        },
+        {
+          "id": "n_file_landing",
+          "label": "Object Landing Zone (S3/GCS/Blob)",
+          "iconId": "aws-s3",
+          "vendor": "aws",
+          "notes": "Secure object storage for raw DICOM files and generated thumbnails.",
+          "x": 400,
+          "y": 200,
+          "lane": "",
+          "metadata": {
+            "group": "Ingestion"
+          }
+        },
+        {
+          "id": "n_metadata_extractor",
+          "label": "Metadata Extractor (DLT/ETL)",
+          "iconId": "databricks-dlt",
+          "vendor": "databricks",
+          "notes": "Pipelines that parse DICOM headers and produce normalized metadata records into Delta.",
+          "x": 400,
+          "y": 340,
+          "lane": "",
+          "metadata": {
+            "group": "Ingestion"
+          }
+        },
+        {
+          "id": "n_raw_lake",
+          "label": "Raw Image Lake (Delta)",
+          "iconId": "databricks-lakehouse",
+          "vendor": "databricks",
+          "notes": "Delta-backed storage layer referencing the raw DICOM objects with partitioning for efficient reads.",
+          "x": 760,
+          "y": 60,
+          "lane": "",
+          "metadata": {
+            "group": "Storage"
+          }
+        },
+        {
+          "id": "n_delta_metadata",
+          "label": "Indexed Metadata (Delta Tables)",
+          "iconId": "databricks-sql-warehouses",
+          "vendor": "databricks",
+          "notes": "Normalized, queryable metadata tables for studies, series, instances, and extracted attributes.",
+          "x": 760,
+          "y": 200,
+          "lane": "",
+          "metadata": {
+            "group": "Storage"
+          }
+        },
+        {
+          "id": "n_metadata_db",
+          "label": "Search Index DB",
+          "iconId": "azure-sql",
+          "vendor": "azure",
+          "notes": "Low-latency index for search and quick clinical lookups (optional complement to Delta).",
+          "x": 760,
+          "y": 340,
+          "lane": "",
+          "metadata": {
+            "group": "Storage"
+          }
+        },
+        {
+          "id": "n_preprocessing",
+          "label": "Image Preprocessing",
+          "iconId": "databricks-notebook",
+          "vendor": "databricks",
+          "notes": "Notebooks/jobs for normalization, resampling, de-identification, and thumbnail generation.",
+          "x": 1120,
+          "y": 60,
+          "lane": "",
+          "metadata": {
+            "group": "Processing & Governance"
+          }
+        },
+        {
+          "id": "n_feature_extraction",
+          "label": "Feature Extraction (Embeddings)",
+          "iconId": "databricks-ml",
+          "vendor": "databricks",
+          "notes": "ML pipelines that compute radiomics/deep embeddings stored as feature tables.",
+          "x": 1120,
+          "y": 200,
+          "lane": "",
+          "metadata": {
+            "group": "Processing & Governance"
+          }
+        },
+        {
+          "id": "n_model_training",
+          "label": "Training Jobs",
+          "iconId": "databricks-jobs-pipelines",
+          "vendor": "databricks",
+          "notes": "Distributed training runs for progression models using labeled cohorts and features.",
+          "x": 1120,
+          "y": 340,
+          "lane": "",
+          "metadata": {
+            "group": "Processing & Governance"
+          }
+        },
+        {
+          "id": "n_model_registry",
+          "label": "Model Registry",
+          "iconId": "databricks-models",
+          "vendor": "databricks",
+          "notes": "Central registry for model versions, lineage, validation metadata, and deployment artifacts.",
+          "x": 1120,
+          "y": 480,
+          "lane": "",
+          "metadata": {
+            "group": "Processing & Governance"
+          }
+        },
+        {
+          "id": "n_unity_catalog",
+          "label": "Unity Catalog / Governance",
+          "iconId": "databricks-governance",
+          "vendor": "databricks",
+          "notes": "Central data governance, access control, and fine-grained permissions for data and models.",
+          "x": 1120,
+          "y": 620,
+          "lane": "",
+          "metadata": {
+            "group": "Processing & Governance"
+          }
+        },
+        {
+          "id": "n_access_control",
+          "label": "Access & Audit",
+          "iconId": "databricks-governance",
+          "vendor": "databricks",
+          "notes": "RBAC, audit logging, and policy enforcement for PHI and model access.",
+          "x": 1120,
+          "y": 760,
+          "lane": "",
+          "metadata": {
+            "group": "Processing & Governance"
+          }
+        },
+        {
+          "id": "n_model_serving",
+          "label": "Model Serving / Scoring",
+          "iconId": "databricks-serving",
+          "vendor": "databricks",
+          "notes": "Real-time or batch endpoints to score images and produce disease progression scores.",
+          "x": 1400,
+          "y": 60,
+          "lane": "",
+          "metadata": {
+            "group": "Consumers"
+          }
+        },
+        {
+          "id": "n_radiology_viewer",
+          "label": "Radiology Viewer",
+          "iconId": "generic-web-app",
+          "vendor": "generic",
+          "notes": "Clinical viewer that displays images, thumbnails, and model overlay or progression timelines.",
+          "x": 1400,
+          "y": 200,
+          "lane": "",
+          "metadata": {
+            "group": "Consumers"
+          }
+        },
+        {
+          "id": "n_clinician_dashboard",
+          "label": "Clinician Dashboard",
+          "iconId": "generic-dashboard",
+          "vendor": "generic",
+          "notes": "Dashboards and patient timelines combining EHR data, metadata, thumbnails and progression scores.",
+          "x": 1400,
+          "y": 340,
+          "lane": "",
+          "metadata": {
+            "group": "Consumers"
+          }
+        },
+        {
+          "id": "n_research_notebook",
+          "label": "Research Notebook/API",
+          "iconId": "databricks-notebook",
+          "vendor": "databricks",
+          "notes": "Secure notebooks and APIs for data scientists to explore images, features, and model experiments.",
+          "x": 1400,
+          "y": 480,
+          "lane": "",
+          "metadata": {
+            "group": "Consumers"
+          }
+        },
+        {
+          "id": "n_thumbnail_store",
+          "label": "Thumbnail Store",
+          "iconId": "generic-storage",
+          "vendor": "generic",
+          "notes": "Fast-access store for generated thumbnails used by viewers and dashboards.",
+          "x": 1400,
+          "y": 620,
+          "lane": "",
+          "metadata": {
+            "group": "Consumers"
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "e_pacs_to_ingest",
+          "source": "n_sources_pacs",
+          "target": "n_ingest_service",
+          "label": "DICOM C-STORE / DICOMweb",
+          "protocol": "DICOM"
+        },
+        {
+          "id": "e_devices_to_ingest",
+          "source": "n_sources_devices",
+          "target": "n_ingest_service",
+          "label": "DICOM C-STORE",
+          "protocol": "DICOM"
+        },
+        {
+          "id": "e_ehr_to_metadata_extractor",
+          "source": "n_sources_ehr",
+          "target": "n_metadata_extractor",
+          "label": "Patient/context sync",
+          "protocol": "REST"
+        },
+        {
+          "id": "e_ingest_to_landing",
+          "source": "n_ingest_service",
+          "target": "n_file_landing",
+          "label": "write raw DICOM",
+          "protocol": "S3"
+        },
+        {
+          "id": "e_landing_to_metadata_extractor",
+          "source": "n_file_landing",
+          "target": "n_metadata_extractor",
+          "label": "object created event",
+          "protocol": "S3 Event"
+        },
+        {
+          "id": "e_metadata_extractor_to_delta",
+          "source": "n_metadata_extractor",
+          "target": "n_delta_metadata",
+          "label": "write normalized metadata",
+          "protocol": "Delta"
+        },
+        {
+          "id": "e_metadata_extractor_to_rawlake",
+          "source": "n_metadata_extractor",
+          "target": "n_raw_lake",
+          "label": "link to raw objects (pointers)",
+          "protocol": "Delta"
+        },
+        {
+          "id": "e_rawlake_to_preprocessing",
+          "source": "n_raw_lake",
+          "target": "n_preprocessing",
+          "label": "read raw DICOM for preprocessing",
+          "protocol": "Delta"
+        },
+        {
+          "id": "e_preprocessing_to_thumbnail",
+          "source": "n_preprocessing",
+          "target": "n_thumbnail_store",
+          "label": "write thumbnails",
+          "protocol": "HTTP"
+        },
+        {
+          "id": "e_preprocessing_to_feature",
+          "source": "n_preprocessing",
+          "target": "n_feature_extraction",
+          "label": "preprocessed images",
+          "protocol": "Delta"
+        },
+        {
+          "id": "e_feature_to_training",
+          "source": "n_feature_extraction",
+          "target": "n_model_training",
+          "label": "feature tables",
+          "protocol": "Delta"
+        },
+        {
+          "id": "e_training_to_registry",
+          "source": "n_model_training",
+          "target": "n_model_registry",
+          "label": "register model + lineage",
+          "protocol": "REST"
+        },
+        {
+          "id": "e_registry_to_serving",
+          "source": "n_model_registry",
+          "target": "n_model_serving",
+          "label": "deploy model",
+          "protocol": "gRPC"
+        },
+        {
+          "id": "e_serving_to_dashboard",
+          "source": "n_model_serving",
+          "target": "n_clinician_dashboard",
+          "label": "progression score API",
+          "protocol": "REST"
+        },
+        {
+          "id": "e_delta_to_radiology",
+          "source": "n_delta_metadata",
+          "target": "n_radiology_viewer",
+          "label": "metadata queries",
+          "protocol": "JDBC"
+        },
+        {
+          "id": "e_thumbnail_to_viewer",
+          "source": "n_thumbnail_store",
+          "target": "n_radiology_viewer",
+          "label": "thumbnail fetch",
+          "protocol": "HTTP"
+        },
+        {
+          "id": "e_delta_to_notebook",
+          "source": "n_delta_metadata",
+          "target": "n_research_notebook",
+          "label": "exploratory queries",
+          "protocol": "JDBC"
+        },
+        {
+          "id": "e_ehr_to_dashboard",
+          "source": "n_sources_ehr",
+          "target": "n_clinician_dashboard",
+          "label": "patient context",
+          "protocol": "FHIR/REST"
+        },
+        {
+          "id": "e_unity_to_delta",
+          "source": "n_unity_catalog",
+          "target": "n_delta_metadata",
+          "label": "policy enforcement / catalog",
+          "protocol": "REST"
+        },
+        {
+          "id": "e_access_audit_to_registry",
+          "source": "n_access_control",
+          "target": "n_model_registry",
+          "label": "audit & RBAC",
+          "protocol": "REST"
+        },
+        {
+          "id": "e_access_audit_to_rawlake",
+          "source": "n_access_control",
+          "target": "n_raw_lake",
+          "label": "access logging",
+          "protocol": "REST"
+        },
+        {
+          "id": "e_research_to_serving",
+          "source": "n_research_notebook",
+          "target": "n_model_serving",
+          "label": "batch scoring / validate",
+          "protocol": "REST"
+        }
+      ],
+      "refinements": [
+        "What is the expected daily/peak volume of DICOM objects and average image size to size storage and compute appropriately?",
+        "Are there existing de-identification requirements or tools to apply before images leave on-prem?",
+        "Which specific regulatory controls (HIPAA, GDPR, local) must be enforced? Provide policy documents and DPO contact.",
+        "Do clinicians require real-time scoring in the PACS viewer, or is batch scoring with daily updates acceptable?",
+        "Which source systems should be authoritative for patient identifiers (EHR vs PACS) to avoid linking errors?"
+      ],
+      "architectureOptions": [
+        {
+          "name": "Metadata-First (Minimal)",
+          "summary": "Index DICOM headers and provide thumbnails without heavy ML — fastest path to value for discovery and search.",
+          "whenToUse": [
+            "Customer needs quick search and visualization of imaging catalog.",
+            "Limited budget or no immediate need for automated progression scoring.",
+            "Testing feasibility and clinician workflows before full ML investment."
+          ],
+          "benefits": [
+            "Faster time-to-value (weeks).",
+            "Lower storage/compute costs because heavy ML is deferred.",
+            "Simpler compliance scope focused on metadata handling and thumbnails."
+          ],
+          "tradeoffs": [
+            "No automated progression scoring or advanced analytics initially.",
+            "Limited capability to derive longitudinal insights beyond searchable metadata."
+          ],
+          "idealMaturityLevel": "Early (data discovery and cataloging)",
+          "platformMapping": [
+            "Databricks for metadata pipelines",
+            "Object storage for raw DICOM and thumbnails",
+            "Lightweight search DB (Azure SQL / managed DB)"
+          ],
+          "components": [
+            {
+              "layer": "Ingestion",
+              "items": [
+                "DICOM Ingest Service",
+                "Object Landing Zone",
+                "Metadata Extractor (DLT)"
+              ]
+            },
+            {
+              "layer": "Storage",
+              "items": [
+                "Raw Image Lake (Delta)",
+                "Indexed Metadata (Delta tables)",
+                "Thumbnail Store"
+              ]
+            },
+            {
+              "layer": "Consumers",
+              "items": [
+                "Radiology Viewer (thumbnails)",
+                "Clinician Dashboard (metadata)"
+              ]
+            }
+          ],
+          "talkTrack": [
+            "Start by cataloging everything: metadata search + thumbnails unlock immediate clinician value.",
+            "Defer complex model work until you have labeled cohorts and clinician acceptance."
+          ]
+        },
+        {
+          "name": "Databricks Lakehouse (Standard)",
+          "summary": "Full Databricks Lakehouse implementation with Delta metadata tables, preprocessing, feature extraction, and managed model lifecycle.",
+          "whenToUse": [
+            "Customer plans to run validated ML models and needs repeatable, governed pipelines.",
+            "Need for strong governance, lineage, and integrated data+ML platform."
+          ],
+          "benefits": [
+            "Unified platform for data engineering, analytics, and ML with governance.",
+            "Production-ready model lifecycle with registry and serving.",
+            "Easier compliance and auditability via Unity Catalog patterns."
+          ],
+          "tradeoffs": [
+            "Higher initial implementation effort and cost than metadata-only approach.",
+            "Requires Databricks licensing and skilled data/ML engineers."
+          ],
+          "idealMaturityLevel": "Medium (productionization of analytics & ML)",
+          "platformMapping": [
+            "Databricks (Delta Lake, DLT, ML, Model Registry)",
+            "Object storage (S3/GCS/Azure Blob)",
+            "Managed SQL DB for low-latency search"
+          ],
+          "components": [
+            {
+              "layer": "Ingestion",
+              "items": [
+                "DICOM Ingest Service",
+                "DLT pipelines for metadata"
+              ]
+            },
+            {
+              "layer": "Processing & ML",
+              "items": [
+                "Preprocessing notebooks/jobs",
+                "Feature extraction pipelines",
+                "Training jobs and Model Registry",
+                "Model serving endpoints"
+              ]
+            },
+            {
+              "layer": "Governance",
+              "items": [
+                "Unity Catalog access policies",
+                "Audit and lineage"
+              ]
+            }
+          ],
+          "talkTrack": [
+            "Implement the Lakehouse to unify images, metadata and models for both clinical and research use-cases.",
+            "This pattern reduces operational friction and accelerates validated model deployment."
+          ]
+        },
+        {
+          "name": "Advanced AI & Federated / Edge (Comprehensive)",
+          "summary": "Adds large-scale AI workflows, federated learning, and edge scoring to support multi-site studies and low-latency inference near PACS.",
+          "whenToUse": [
+            "Distributed hospital network requiring model training without centralizing PHI.",
+            "Need for ultra-low-latency inference in clinical workflows."
+          ],
+          "benefits": [
+            "Enables collaborative model improvements across sites while reducing PHI movement.",
+            "Supports low-latency clinical inference and device-level scoring."
+          ],
+          "tradeoffs": [
+            "Significantly higher complexity and governance requirements.",
+            "Longer timeline and more resources (security, orchestration)."
+          ],
+          "idealMaturityLevel": "Advanced (large orgs with multi-site operations)",
+          "platformMapping": [
+            "Databricks for orchestration and central analytics",
+            "Edge inference runtimes (on-prem appliances)",
+            "Federated learning framework (custom or third-party)"
+          ],
+          "components": [
+            {
+              "layer": "Edge / Federation",
+              "items": [
+                "On-prem inference appliances",
+                "Federated training coordinator"
+              ]
+            },
+            {
+              "layer": "Central Lakehouse",
+              "items": [
+                "Delta-based feature aggregations",
+                "Cross-site validation pipelines"
+              ]
+            },
+            {
+              "layer": "Governance",
+              "items": [
+                "Advanced DLP, attestation, and federated consent management"
+              ]
+            }
+          ],
+          "talkTrack": [
+            "Use federated patterns if centralizing PHI is not permitted; otherwise central Lakehouse is simpler.",
+            "Edge inference helps where sub-second responses in a PACS viewer are required."
+          ]
+        }
+      ]
+    },
+    "architectAnswers": {
+      "why_w2": "Understand patient health status and disease progression with DICOM data\nMedical images including CT, X-ray, PET, ultrasound, mammogram and MRI are essential to many diagnostic and treatment processes in healthcare, ranging from orthopedics to oncology to obstetrics. With Databricks Lakehouse for Healthcare and Life Sciences, data teams can:\n\nIngest and catalog metadata for all your DICOM images\n\nAnalyze file and image header metadata\n\nView thumbnails and image samples"
+    },
+    "story": {
+      "strategy": "Healthcare teams need a safe, governed way to turn imaging into longitudinal insights that inform treatment decisions. The chosen strategy is a phased Lakehouse approach: begin with metadata-first capabilities to unlock search and thumbnails quickly, then mature to feature extraction and validated ML-driven progression scoring integrated into clinician workflows. This pattern lets clinical teams see value early while building the data and validation assets necessary for production-grade AI.",
+      "technology": "We use Databricks Lakehouse (Delta tables, DLT, Databricks ML and Model Registry) as the central platform, object storage (S3/GCS/Azure Blob) for raw DICOM persistence, and Databricks Serving for inference. Unity Catalog-style governance enforces access controls and lineage. DICOM-aware ingest services and preprocessing notebooks handle de-identification, thumbnailing and radiomic/deep feature extraction before feeding feature tables for training and scoring.",
+      "outcome": "Clinicians gain fast access to searchable imaging catalogs and thumbnails, reducing time-to-compare studies and enabling more consistent assessments. Over the first 6–12 months, the platform delivers a pilot-validated disease progression model that integrates into clinician dashboards and viewers, supporting treatment planning and research cohort discovery.",
+      "returnValue": "Measurable returns include reduced clinician time to find prior studies (minutes saved per case), fewer redundant scans, and accelerated research throughput. With a validated progression model in pilot, the organization can expect improved decision consistency and potential downstream savings from optimized treatment plans and trial recruitment efficiencies.",
+      "years": "Over 3–5 years the Lakehouse scales to additional imaging domains and departments, accumulates labeled cohorts for progressively better models, and supports federated patterns for multi-site studies as needed. Governance and audit capabilities ensure evolving regulatory compliance, while integrated ML lifecycle management reduces operational overhead and speeds innovation across clinical and research teams."
+    }
+  }

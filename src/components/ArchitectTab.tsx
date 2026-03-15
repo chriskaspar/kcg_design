@@ -25,9 +25,10 @@ export function ArchitectTab({ tab, answers, onAnswerChange }: ArchitectTabProps
     groups.find((g) => `${g.letter}:${g.meaning}` === key)!.questions.push(q);
   }
 
-  const [activeGroup, setActiveGroup] = useState(groups[0]?.letter ?? "");
+  const groupKey = (g: QuestionGroup) => `${g.letter}:${g.meaning}`;
+  const [activeGroup, setActiveGroup] = useState(groups[0] ? groupKey(groups[0]) : "");
 
-  const currentGroup = groups.find((g) => g.letter === activeGroup) ?? groups[0];
+  const currentGroup = groups.find((g) => groupKey(g) === activeGroup) ?? groups[0];
   const groupAnswered = (g: QuestionGroup) => g.questions.filter((q) => answers[q.id]?.trim().length > 0).length;
 
   return (
@@ -54,13 +55,13 @@ export function ArchitectTab({ tab, answers, onAnswerChange }: ArchitectTabProps
         <div className="mt-4 flex gap-1 overflow-x-auto pb-1">
           {groups.map((g) => {
             const answered = groupAnswered(g);
-            const isActive = g.letter === activeGroup;
+            const isActive = groupKey(g) === activeGroup;
             const complete = answered === g.questions.length;
             return (
               <button
-                key={g.letter}
+                key={groupKey(g)}
                 type="button"
-                onClick={() => setActiveGroup(g.letter)}
+                onClick={() => setActiveGroup(groupKey(g))}
                 className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                   isActive
                     ? "bg-cyan-500 text-slate-950"
@@ -129,24 +130,24 @@ export function ArchitectTab({ tab, answers, onAnswerChange }: ArchitectTabProps
               <button
                 type="button"
                 onClick={() => {
-                  const idx = groups.findIndex((g) => g.letter === activeGroup);
-                  if (idx > 0) setActiveGroup(groups[idx - 1].letter);
+                  const idx = groups.findIndex((g) => groupKey(g) === activeGroup);
+                  if (idx > 0) setActiveGroup(groupKey(groups[idx - 1]));
                 }}
-                disabled={groups[0]?.letter === activeGroup}
+                disabled={groups[0] ? groupKey(groups[0]) === activeGroup : true}
                 className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/15 disabled:opacity-40"
               >
                 ← Previous
               </button>
               <span className="text-xs text-slate-600">
-                {groups.findIndex((g) => g.letter === activeGroup) + 1} of {groups.length} categories
+                {groups.findIndex((g) => groupKey(g) === activeGroup) + 1} of {groups.length} categories
               </span>
               <button
                 type="button"
                 onClick={() => {
-                  const idx = groups.findIndex((g) => g.letter === activeGroup);
-                  if (idx < groups.length - 1) setActiveGroup(groups[idx + 1].letter);
+                  const idx = groups.findIndex((g) => groupKey(g) === activeGroup);
+                  if (idx < groups.length - 1) setActiveGroup(groupKey(groups[idx + 1]));
                 }}
-                disabled={groups[groups.length - 1]?.letter === activeGroup}
+                disabled={groups[groups.length - 1] ? groupKey(groups[groups.length - 1]) === activeGroup : true}
                 className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/15 disabled:opacity-40"
               >
                 Next →

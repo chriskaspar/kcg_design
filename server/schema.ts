@@ -129,9 +129,18 @@ export const playbookSchema = z.object({
   )
 });
 
+export const storySchema = z.object({
+  strategy: z.string(),
+  technology: z.string(),
+  outcome: z.string(),
+  returnValue: z.string(),
+  years: z.string()
+});
+
 export const studioResponseSchema = z.object({
   architecture: architectureSchema,
   playbook: playbookSchema,
+  story: storySchema.nullable(),
   assistantMessage: z.string()
 });
 

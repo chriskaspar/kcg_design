@@ -4,7 +4,7 @@ import { Activity, ArrowLeft, ArrowRight, Check, Sparkles, X } from "lucide-reac
 import { ARCHITECT_TABS } from "../lib/architectFramework";
 import { ArchitectTab } from "./ArchitectTab";
 import type { ArchitectAnswers, StoryOutput } from "../types/architect";
-import type { SavedScenario, ScenarioInput } from "../types/architecture";
+import type { ArchitectureSpec, SavedScenario, ScenarioInput, ScenarioPlaybook } from "../types/architecture";
 import { normalizeArchitecture } from "../lib/architecture";
 
 interface NewScenarioWizardProps {
@@ -12,6 +12,20 @@ interface NewScenarioWizardProps {
   onClose: () => void;
   onSave: (scenario: SavedScenario) => void;
   initialProblemStatement?: string;
+  /** Pre-fill wizard with an existing scenario's content for view/update flow */
+  prefill?: {
+    scenarioTitle: string;
+    industry: string;
+    answers: ArchitectAnswers;
+    story?: StoryOutput | null;
+  };
+  /** Existing generated content — passed for update mode so OpenAI can refine rather than create from scratch */
+  currentContent?: {
+    architecture: ArchitectureSpec;
+    playbook: ScenarioPlaybook;
+    story: StoryOutput | null;
+    solutionNarrative: string;
+  };
 }
 
 const INPUT_TABS = ARCHITECT_TABS.filter((t) => t.id !== "STORY");
@@ -32,29 +46,41 @@ const defaultInput: ScenarioInput = {
   outputDepth: "Executive + Technical"
 };
 
-export function NewScenarioWizard({ open, onClose, onSave, initialProblemStatement }: NewScenarioWizardProps) {
+export function NewScenarioWizard({ open, onClose, onSave, initialProblemStatement, prefill, currentContent }: NewScenarioWizardProps) {
+  const isUpdateMode = !!prefill;
   const [step, setStep] = useState(0); // 0 = setup, 1..8 = ARCHITECT tabs, 9 = generate/story
   const [scenarioTitle, setScenarioTitle] = useState("");
   const [industry, setIndustry] = useState("");
   const [answers, setAnswers] = useState<ArchitectAnswers>({});
   const [story, setStory] = useState<StoryOutput | null>(null);
+  const [generatedScenario, setGeneratedScenario] = useState<{ architecture: ArchitectureSpec; playbook: ScenarioPlaybook } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
-    if (open && initialProblemStatement) {
+    if (!open) return;
+    if (prefill) {
+      setScenarioTitle(prefill.scenarioTitle);
+      setIndustry(prefill.industry);
+      setAnswers(prefill.answers);
+      setStory(prefill.story ?? null);
+      setGeneratedScenario(null);
+      setStep(0);
+    } else if (initialProblemStatement) {
       const firstLine = initialProblemStatement.split("\n")[0];
       setScenarioTitle(firstLine.length > 80 ? firstLine.slice(0, 77) + "..." : firstLine);
       setAnswers({ why_w2: initialProblemStatement });
       setStep(0);
       setStory(null);
-    } else if (open && !initialProblemStatement) {
+      setGeneratedScenario(null);
+    } else {
       setStep(0);
       setScenarioTitle("");
       setIndustry("");
       setAnswers({});
       setStory(null);
+      setGeneratedScenario(null);
     }
-  }, [open, initialProblemStatement]);
+  }, [open, initialProblemStatement, prefill]);
 
   const TOTAL_STEPS = INPUT_TABS.length + 2; // setup + 8 tabs + story
   const isSetup = step === 0;
@@ -70,37 +96,66 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
 
   const handleGenerate = async () => {
     setIsGenerating(true);
+    const scenarioInput: ScenarioInput = {
+      scenarioTitle: scenarioTitle || "New Scenario",
+      industry,
+      customerType: "",
+      problemStatement: answers["why_w2"] || "",
+      businessGoals: answers["why_w3"] || "",
+      constraints: answers["goal_l1"] || "",
+      timeline: answers["goal_l2"] || "12 months",
+      currentState: answers["flow_f1"] || "",
+      desiredFutureState: answers["win_n1"] || "",
+      stakeholders: answers["why_h1"] || "",
+      compliance: [],
+      architecturePreference: "Databricks",
+      outputDepth: "Comprehensive"
+    };
     try {
-      const response = await fetch("/api/studio/generate-story", {
+      const body = isUpdateMode && currentContent
+        ? {
+            intent: "generateDesign",
+            scenarioInput,
+            architectAnswers: answers,
+            currentArchitecture: { ...currentContent.architecture, solutionOverview: currentContent.solutionNarrative },
+            currentPlaybook: currentContent.playbook,
+            currentSolutionNarrative: currentContent.solutionNarrative,
+            currentStory: currentContent.story
+          }
+        : { intent: "generateNew", scenarioInput, architectAnswers: answers };
+
+      const res = await fetch("/api/studio/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers, scenarioInput: { scenarioTitle, industry } })
+        body: JSON.stringify(body)
       });
-      if (response.ok) {
-        const payload = await response.json() as { story: StoryOutput };
-        setStory(payload.story);
-      } else {
-        throw new Error("API unavailable");
+      if (res.ok) {
+        const data = await res.json() as { architecture: ArchitectureSpec; playbook: ScenarioPlaybook; story: StoryOutput | null };
+        setGeneratedScenario({ architecture: normalizeArchitecture(data.architecture), playbook: data.playbook });
+        if (data.story) setStory(data.story);
       }
     } catch {
-      // Mock story from answers
-      const win1 = answers["win_n1"] || answers["win_w1"] || "Enable new capabilities and improved insights";
-      setStory({
-        strategy: `A governed lakehouse platform strategy for ${scenarioTitle || "the organization"}, delivering analytics modernization with a phased approach to AI readiness.`,
-        technology: "Databricks lakehouse with medallion architecture (Bronze/Silver/Gold), Unity Catalog governance, Lakeflow for orchestration, and curated data products for BI, ML, and AI consumption.",
-        outcome: win1,
-        returnValue: answers["win_w1"] || "Reduced operational overhead, improved decision-making speed, and accelerated AI program readiness.",
-        years: answers["goal_o2"] || `The ${scenarioTitle || "platform"} architecture scales incrementally, supporting growing data domains, AI capabilities, and organizational maturity over the long term.`
-      });
+      // Keep existing story on error (update mode) or set minimal fallback (new mode)
+      if (!isUpdateMode) {
+        const win1 = answers["win_n1"] || answers["win_w1"] || "Enable new capabilities and improved insights";
+        setStory({
+          strategy: `A governed lakehouse platform strategy for ${scenarioTitle || "the organization"}, delivering analytics modernization with a phased approach to AI readiness.`,
+          technology: "Databricks lakehouse with medallion architecture (Bronze/Silver/Gold), Unity Catalog governance, Lakeflow for orchestration, and curated data products for BI, ML, and AI consumption.",
+          outcome: win1,
+          returnValue: answers["win_w1"] || "Reduced operational overhead, improved decision-making speed, and accelerated AI program readiness.",
+          years: answers["goal_o2"] || `The ${scenarioTitle || "platform"} architecture scales incrementally, supporting growing data domains, AI capabilities, and organizational maturity over the long term.`
+        });
+      }
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleSave = () => {
+    const title = scenarioTitle || "New Scenario";
     const input: ScenarioInput = {
       ...defaultInput,
-      scenarioTitle: scenarioTitle || "New Scenario",
+      scenarioTitle: title,
       industry,
       problemStatement: answers["why_w2"] || "",
       businessGoals: answers["why_w3"] || "",
@@ -113,10 +168,11 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
 
     const scenario: SavedScenario = {
       id: crypto.randomUUID(),
-      title: scenarioTitle || "New Scenario",
+      title,
       input,
-      architecture: normalizeArchitecture({
-        title: scenarioTitle || "New Scenario",
+      // Use AI-generated architecture/playbook if available, else build minimal stubs from answers
+      architecture: generatedScenario?.architecture ?? normalizeArchitecture({
+        title,
         summary: answers["goal_g1"] || "",
         solutionOverview: story?.strategy || answers["goal_g1"] || "",
         assumptions: [],
@@ -128,13 +184,13 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
         edges: [],
         refinements: []
       }),
-      playbook: {
-        scenarioTitle: scenarioTitle || "New Scenario",
+      playbook: generatedScenario?.playbook ?? {
+        scenarioTitle: title,
         scenarioSummary: answers["goal_g1"] || "",
         businessDrivers: answers["why_w1"] ? answers["why_w1"].split(". ").filter(Boolean) : [],
         constraints: answers["goal_l1"] ? answers["goal_l1"].split(". ").filter(Boolean) : [],
         recommendedEngagementApproach: answers["goal_g2"] ? [answers["goal_g2"]] : [],
-        confidenceRating: 75,
+        confidenceRating: 5,
         recommendedConversationPath: ["Discovery", "Architecture design", "Tradeoffs", "Executive summary"],
         discoveryQuestions: [],
         problemFraming: {
@@ -174,6 +230,7 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
     setIndustry("");
     setAnswers({});
     setStory(null);
+    setGeneratedScenario(null);
     onClose();
   };
 
@@ -193,7 +250,7 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
             <div className="flex items-center gap-3">
               <Sparkles className="h-4 w-4 text-cyan-400" />
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-300">New Scenario</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-300">{isUpdateMode ? "View / Update" : "New Scenario"}</p>
                 <p className="text-sm font-semibold text-white">{scenarioTitle || "Untitled scenario"}</p>
               </div>
             </div>
@@ -292,23 +349,22 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
                   <div className="mx-auto w-full max-w-[760px] space-y-5">
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-300">Final Step — T: Two-Minute Summary</p>
-                      <h2 className="mt-1 text-2xl font-bold text-white">Generate your STORY</h2>
+                      <h2 className="mt-1 text-2xl font-bold text-white">{isUpdateMode ? "Regenerate Solution, Design & Story" : "Create Solution, Design & Story"}</h2>
                       <p className="mt-1 text-sm text-slate-400">
-                        {answeredCount} of {allQuestionIds.length} questions answered. Generate your executive narrative and save the scenario.
+                        {answeredCount} of {allQuestionIds.length} questions answered. {isUpdateMode ? "Regenerate all outputs based on your updated inputs." : "Generate your full scenario package — architecture, solution, and executive narrative."}
                       </p>
                     </div>
 
-                    {!story ? (
-                      <button
-                        type="button"
-                        onClick={handleGenerate}
-                        disabled={isGenerating || answeredCount === 0}
-                        className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-50"
-                      >
-                        {isGenerating ? <Activity className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        {isGenerating ? "Generating..." : "Generate STORY"}
-                      </button>
-                    ) : (
+                    <button
+                      type="button"
+                      onClick={handleGenerate}
+                      disabled={isGenerating || (!isUpdateMode && answeredCount === 0)}
+                      className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:opacity-50"
+                    >
+                      {isGenerating ? <Activity className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      {isGenerating ? "Generating..." : isUpdateMode ? "Regenerate Solution, Design & Story" : "Create Solution, Design & Story"}
+                    </button>
+                    {!isUpdateMode && story && (
                       <div className="space-y-4">
                         {(["strategy", "technology", "outcome", "returnValue", "years"] as const).map((field) => {
                           const labels: Record<string, string> = { strategy: "Strategy", technology: "Technology", outcome: "Outcomes", returnValue: "Return on Investment", years: "Long-term Vision" };
@@ -354,7 +410,7 @@ export function NewScenarioWizard({ open, onClose, onSave, initialProblemStateme
               Back
             </button>
             <p className="text-xs text-slate-600">Step {step + 1} of {TOTAL_STEPS}</p>
-            {isStory && story ? (
+            {isStory && (isUpdateMode || story) ? (
               <button
                 type="button"
                 onClick={handleSave}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { jsPDF } from "jspdf";
-import { Activity, ArrowRight, Bot, ChevronDown, ClipboardCopy, Code2, FileOutput, FolderOpen, Maximize2, Minimize2, Moon, PanelLeftClose, PanelLeftOpen, Plus, Save, Search, Sparkles, SunMedium, FileText } from "lucide-react";
+import { ArrowRight, BookOpen, Bot, ChevronDown, ClipboardCopy, Code2, Compass, Edit3, FileOutput, FileText, FolderOpen, Heart, Home, Layers, Lightbulb, Maximize2, Minimize2, Moon, PanelLeftClose, PanelLeftOpen, Plus, Save, Search, Sparkles, SunMedium, TrendingUp, ShoppingCart, Factory, Cpu, Building2, FlaskConical, Truck } from "lucide-react";
 import { DesignCanvas } from "./components/DesignCanvas";
 import { DiscoveryPanel } from "./components/DiscoveryPanel";
 import { StoryTab } from "./components/StoryTab";
@@ -23,10 +23,10 @@ const createMessage = (role: ChatMessage["role"], content: string): ChatMessage 
   content
 });
 
-const workspaceTabs: WorkspaceTab[] = ["Scenario", "Discovery", "Design", "Solution", "Story"];
+const workspaceTabs: WorkspaceTab[] = ["Home", "Scenario", "Discovery", "Design", "Solution", "Story"];
 
 const parseWorkspaceTab = (value: string | null): WorkspaceTab =>
-  workspaceTabs.includes((value ?? "") as WorkspaceTab) ? ((value ?? "Scenario") as WorkspaceTab) : "Scenario";
+  workspaceTabs.includes((value ?? "") as WorkspaceTab) ? ((value ?? "Home") as WorkspaceTab) : "Home";
 
 const readInitialUrlState = () => {
   const params = new URLSearchParams(window.location.search);
@@ -80,15 +80,18 @@ function App() {
   const [selectedStaticScenarioId, setSelectedStaticScenarioId] = useState(initialUrlState.scenario);
   const [architectAnswers, setArchitectAnswers] = useState<ArchitectAnswers>({});
   const [story, setStory] = useState<StoryOutput | null>(null);
-  const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+
   const [jsonEditorOpen, setJsonEditorOpen] = useState<"scenario" | "architecture" | null>(null);
   const [newScenarioOpen, setNewScenarioOpen] = useState(false);
+  const [viewUpdateOpen, setViewUpdateOpen] = useState(false);
   const [wizardInitialText, setWizardInitialText] = useState("");
+  const [homeSearch, setHomeSearch] = useState("");
+  const [homeIndustryFilter, setHomeIndustryFilter] = useState<string | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [editingSections, setEditingSections] = useState<Set<string>>(new Set());
   const [sectionDrafts, setSectionDrafts] = useState<Record<string, string>>({});
   const [isGeneratingDesign, setIsGeneratingDesign] = useState(false);
-  const [isGeneratingSolution, setIsGeneratingSolution] = useState(false);
+
   const canvasExportRef = useRef<(() => Promise<string | null>) | null>(null);
 
   useEffect(() => {
@@ -257,39 +260,6 @@ function App() {
     setArchitectAnswers((current) => ({ ...current, [questionId]: value }));
   };
 
-  const handleGenerateStory = async () => {
-    setIsGeneratingStory(true);
-    try {
-      const response = await fetch("/api/studio/generate-story", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: architectAnswers, scenarioInput, currentArchitecture: architecture })
-      });
-
-      if (response.ok) {
-        const payload = await response.json() as { story: StoryOutput };
-        setStory(payload.story);
-      } else {
-        setStory({
-          strategy: `A governed ${scenarioInput.industry || "enterprise"} data platform built on a lakehouse architecture, unifying sources through a medallion lifecycle and enabling analytics and AI.`,
-          technology: `The platform leverages cloud-native ingestion, a Delta Lake medallion architecture, centralized governance, and curated data products for BI, ML, and AI consumption.`,
-          outcome: `Faster analytics delivery, reduced platform sprawl, trusted data products, and a governed foundation for machine learning and AI use cases.`,
-          returnValue: `Reduced time to insight, lower operational costs through platform consolidation, and accelerated AI-readiness that creates new business value.`,
-          years: `This architecture scales across domains, supports growing data volumes, and provides the governed foundation needed for advanced AI and automation in the years ahead.`
-        });
-      }
-    } catch {
-      setStory({
-        strategy: `A governed lakehouse platform that unifies enterprise data, supports analytics and AI, and delivers trusted data products across the organization.`,
-        technology: `Cloud-native data platform with medallion architecture, centralized governance, and curated consumption layers for BI, ML, and AI.`,
-        outcome: `Improved analytics speed, trusted data products, reduced duplication, and an AI-ready governed foundation.`,
-        returnValue: `Platform consolidation reduces costs; governed data products accelerate decision-making and enable new AI-driven capabilities.`,
-        years: `Scalable, governed architecture that grows with the organization and supports future AI, automation, and cross-domain data sharing.`
-      });
-    } finally {
-      setIsGeneratingStory(false);
-    }
-  };
 
   const handleGenerateDesign = async () => {
     setIsGeneratingDesign(true);
@@ -299,19 +269,22 @@ function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          request: "Generate architecture design",
+          intent: "generateDesign",
           scenarioInput,
           architectAnswers,
-          currentArchitecture: architecture,
+          currentArchitecture: { ...architecture, solutionOverview: solutionNarrative },
           currentPlaybook: playbook,
+          currentSolutionNarrative: solutionNarrative,
+          currentStory: story,
           messages,
           mockResponse
         })
       });
       if (response.ok) {
-        const payload = (await response.json()) as { architecture: ArchitectureSpec; playbook: ScenarioPlaybook; assistantMessage: string };
+        const payload = (await response.json()) as { architecture: ArchitectureSpec; playbook: ScenarioPlaybook; story: StoryOutput | null; assistantMessage: string };
         setArchitecture(normalizeArchitecture(payload.architecture));
         setPlaybook(payload.playbook);
+        if (payload.story) setStory(payload.story);
       } else {
         setArchitecture(normalizeArchitecture(mockResponse.architecture));
         setPlaybook(mockResponse.playbook);
@@ -323,46 +296,6 @@ function App() {
     }
   };
 
-  const handleGenerateSolution = async () => {
-    setIsGeneratingSolution(true);
-    try {
-      const mockResponse = createMockResponse("generate solution", scenarioInput, architecture);
-      const response = await fetch("/api/studio/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          request: "Generate solution narrative",
-          scenarioInput,
-          architectAnswers,
-          currentArchitecture: architecture,
-          currentPlaybook: playbook,
-          messages,
-          mockResponse
-        })
-      });
-      if (response.ok) {
-        const payload = (await response.json()) as { architecture: ArchitectureSpec; playbook: ScenarioPlaybook; assistantMessage: string };
-        const normalizedArch = normalizeArchitecture(payload.architecture);
-        setArchitecture(normalizedArch);
-        setSolutionNarrative(normalizedArch.solutionOverview);
-        setPlaybook(payload.playbook);
-      } else {
-        const brief = [
-          scenarioInput.problemStatement,
-          scenarioInput.businessGoals,
-          scenarioInput.desiredFutureState
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .slice(0, 400);
-        setSolutionNarrative(brief || mockResponse.architecture.solutionOverview);
-      }
-    } catch {
-      // Keep existing solution unchanged
-    } finally {
-      setIsGeneratingSolution(false);
-    }
-  };
 
   const handleSaveScenarioJson = (parsed: unknown) => {
     const data = parsed as { input?: typeof scenarioInput; playbook?: typeof playbook; architecture?: typeof architecture; architectAnswers?: ArchitectAnswers; story?: StoryOutput };
@@ -697,10 +630,115 @@ function App() {
         );
   };
 
+  const industryMeta: Record<string, { icon: React.ReactNode; color: string }> = {
+    "Healthcare": { icon: <Heart className="h-5 w-5" />, color: "from-rose-500/30 to-rose-900/20" },
+    "Financial Services": { icon: <TrendingUp className="h-5 w-5" />, color: "from-emerald-500/30 to-emerald-900/20" },
+    "Retail": { icon: <ShoppingCart className="h-5 w-5" />, color: "from-violet-500/30 to-violet-900/20" },
+    "Manufacturing": { icon: <Factory className="h-5 w-5" />, color: "from-amber-500/30 to-amber-900/20" },
+    "Technology": { icon: <Cpu className="h-5 w-5" />, color: "from-cyan-500/30 to-cyan-900/20" },
+    "Insurance": { icon: <Building2 className="h-5 w-5" />, color: "from-blue-500/30 to-blue-900/20" },
+    "Pharma": { icon: <FlaskConical className="h-5 w-5" />, color: "from-purple-500/30 to-purple-900/20" },
+    "Supply Chain": { icon: <Truck className="h-5 w-5" />, color: "from-orange-500/30 to-orange-900/20" },
+  };
+  const defaultIndustryMeta = { icon: <Layers className="h-5 w-5" />, color: "from-slate-500/30 to-slate-900/20" };
+
   const renderWorkspaceContent = () => {
+    if (workspaceTab === "Home") {
+      const allScenarios = [...staticScenarioLibrary, ...savedScenarios];
+      const industries = Array.from(new Set(allScenarios.map((s) => s.input.industry).filter(Boolean)));
+      const q = homeSearch.trim().toLowerCase();
+      const filtered = allScenarios.filter((s) => {
+        const matchesSearch = !q || [s.title, s.input.industry, s.input.customerType, s.input.problemStatement].join(" ").toLowerCase().includes(q);
+        const matchesIndustry = !homeIndustryFilter || s.input.industry === homeIndustryFilter;
+        return matchesSearch && matchesIndustry;
+      });
+      return (
+        <div className="h-full min-h-0 overflow-y-auto">
+          <div className="px-8 pb-5 pt-8">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-400">SA Studio</p>
+            <h1 className="mb-4 text-2xl font-bold text-white">Scenario Library</h1>
+            <div className="mx-auto max-w-lg">
+              <label className="flex items-center gap-2.5 rounded-full border border-white/10 bg-white/6 px-4 py-2.5 focus-within:border-cyan-500/50 focus-within:bg-white/8">
+                <Search className="h-4 w-4 shrink-0 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search scenarios…"
+                  value={homeSearch}
+                  onChange={(e) => setHomeSearch(e.target.value)}
+                  className="w-full bg-transparent text-sm text-slate-100 placeholder-slate-500 outline-none"
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setHomeIndustryFilter(null)}
+                className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${!homeIndustryFilter ? "bg-cyan-500 text-slate-950" : "bg-white/8 text-slate-300 hover:bg-white/12"}`}
+              >All</button>
+              {industries.map((ind) => (
+                <button
+                  key={ind}
+                  type="button"
+                  onClick={() => setHomeIndustryFilter(homeIndustryFilter === ind ? null : ind)}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition ${homeIndustryFilter === ind ? "bg-cyan-500 text-slate-950" : "bg-white/8 text-slate-300 hover:bg-white/12"}`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+                  {ind}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="px-6 pb-6">
+            {filtered.length === 0 ? (
+              <div className="flex h-40 items-center justify-center text-slate-500 text-sm">No scenarios match your search.</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
+                {filtered.map((s) => {
+                  const meta = industryMeta[s.input.industry] ?? defaultIndustryMeta;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => { loadScenario(s); setWorkspaceTab("Scenario"); }}
+                      className="group flex flex-col overflow-hidden rounded-2xl border border-white/8 bg-white/4 text-left transition hover:border-cyan-500/40 hover:bg-white/7 hover:shadow-[0_0_32px_rgba(6,182,212,0.08)]"
+                    >
+                      <div className={`flex items-center gap-3 bg-gradient-to-br ${meta.color} px-4 py-3`}>
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
+                          {meta.icon}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">{s.input.industry || "General"}</p>
+                          <p className="text-[10px] text-white/50">{s.input.customerType}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-1 flex-col gap-2 p-4">
+                        <p className="text-sm font-semibold leading-5 text-slate-100 group-hover:text-white">{s.title}</p>
+                        {s.input.problemStatement && (
+                          <p className="line-clamp-2 text-[11px] leading-4 text-slate-400">{s.input.problemStatement}</p>
+                        )}
+                        <div className="mt-auto flex items-center justify-between pt-2">
+                          <span className="text-[10px] text-slate-600">{s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : ""}</span>
+                          <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-semibold text-cyan-400 opacity-0 transition group-hover:opacity-100">Open →</span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     if (workspaceTab === "Discovery") {
       return (
-        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="shrink-0 border-b border-white/10 bg-white/3 px-6 py-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-300">ARCHITECT Framework</p>
+            <h2 className="mt-0.5 text-xl font-bold text-white">Discovery</h2>
+            <p className="mt-0.5 text-xs text-slate-400">WHY · GOAL · SAFE · FLOW · DATA · FAST · RUN · WIN — explore and answer questions to build your scenario</p>
+          </div>
           <DiscoveryPanel
             answers={architectAnswers}
             onAnswerChange={updateArchitectAnswer}
@@ -712,12 +750,7 @@ function App() {
     if (workspaceTab === "Story") {
       return (
         <div className="flex min-h-0 min-w-0 flex-col items-stretch overflow-y-auto p-6">
-          <StoryTab
-            story={story}
-            answers={architectAnswers}
-            onGenerate={handleGenerateStory}
-            isGenerating={isGeneratingStory}
-          />
+          <StoryTab story={story} />
         </div>
       );
     }
@@ -885,6 +918,12 @@ function App() {
       };
 
       return (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="shrink-0 border-b border-white/10 bg-white/3 px-6 py-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-cyan-300">Scenario Output</p>
+            <h2 className="mt-0.5 text-xl font-bold text-white">Solution</h2>
+            <p className="mt-0.5 text-xs text-slate-400">Solution summary, engagement approach, architecture details, risks, and deliverables</p>
+          </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="grid gap-4 xl:grid-cols-3 lg:grid-cols-2 grid-cols-1">
             {/* Left column — wider, spanning 2 cols at xl */}
@@ -893,15 +932,6 @@ function App() {
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-300">Narrative</p>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleGenerateSolution}
-                      disabled={isGeneratingSolution}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-cyan-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-300 transition hover:bg-cyan-500/25 disabled:opacity-50"
-                    >
-                      {isGeneratingSolution ? <Activity className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                      {isGeneratingSolution ? "Generating..." : "Generate"}
-                    </button>
                     <button type="button" onClick={() => copyText(solutionNarrative)} className="rounded-full bg-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200">
                       <ClipboardCopy className="mr-1 inline h-3 w-3" />Copy
                     </button>
@@ -1066,6 +1096,7 @@ function App() {
             </div>
           </div>
         </div>
+        </div>
       );
     }
 
@@ -1090,17 +1121,27 @@ function App() {
 
           {/* Center tabs */}
           <div className="flex flex-1 items-center justify-center gap-1">
-            {workspaceTabs.map((value) => (
+            {(
+              [
+                { value: "Home",      icon: <Home      className="h-3 w-3" /> },
+                { value: "Scenario",  icon: <FileText  className="h-3 w-3" /> },
+                { value: "Discovery", icon: <Compass   className="h-3 w-3" /> },
+                { value: "Design",    icon: <Layers    className="h-3 w-3" /> },
+                { value: "Solution",  icon: <Lightbulb className="h-3 w-3" /> },
+                { value: "Story",     icon: <BookOpen  className="h-3 w-3" /> },
+              ] as { value: import("./types/architecture").WorkspaceTab; icon: ReactNode }[]
+            ).map(({ value, icon }) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setWorkspaceTab(value)}
-                className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition ${
+                className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition ${
                   workspaceTab === value
                     ? "bg-white text-slate-950"
                     : "bg-white/10 text-slate-300 hover:bg-white/15"
                 }`}
               >
+                {icon}
                 {value}
               </button>
             ))}
@@ -1178,14 +1219,12 @@ function App() {
 
             <button
               type="button"
-              onClick={() => {
-                setChatOpen(true);
-                setChatDraft(scenarioInput.problemStatement || playbook.scenarioSummary);
-              }}
+              onClick={() => setViewUpdateOpen(true)}
               className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-3.5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+              title="View or update current scenario"
             >
-              <Bot className="h-4 w-4" />
-              Generate
+              <Edit3 className="h-4 w-4" />
+              View / Update
             </button>
           </div>
         </header>
@@ -1334,15 +1373,7 @@ function App() {
                   placeholder="Describe the scenario, request a solution approach, or refine the current design."
                   className="min-h-[150px] w-full rounded-[24px] border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-100 outline-none"
                 />
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    disabled={!chatDraft.trim()}
-                    onClick={() => { setWizardInitialText(chatDraft); setNewScenarioOpen(true); setChatOpen(false); }}
-                    className="shrink-0 rounded-full bg-white/8 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/15 disabled:opacity-40"
-                  >
-                    Use as Scenario →
-                  </button>
+                <div className="mt-3 flex items-center justify-end gap-3">
                   <button
                     type="button"
                     disabled={!chatDraft.trim()}
@@ -1350,7 +1381,7 @@ function App() {
                     className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <ArrowRight className="h-4 w-4" />
-                    Run
+                    Start Scenario
                   </button>
                 </div>
               </div>
@@ -1380,6 +1411,23 @@ function App() {
         onClose={() => setNewScenarioOpen(false)}
         onSave={handleSaveNewScenario}
         initialProblemStatement={wizardInitialText}
+      />
+      <NewScenarioWizard
+        open={viewUpdateOpen}
+        onClose={() => setViewUpdateOpen(false)}
+        onSave={(updated) => { handleSaveNewScenario(updated); setViewUpdateOpen(false); }}
+        prefill={{
+          scenarioTitle: scenarioInput.scenarioTitle,
+          industry: scenarioInput.industry,
+          answers: architectAnswers,
+          story
+        }}
+        currentContent={{
+          architecture,
+          playbook,
+          story,
+          solutionNarrative
+        }}
       />
     </div>
   );

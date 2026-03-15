@@ -1,6 +1,7 @@
 export type VendorId = "aws" | "azure" | "gcp" | "databricks" | "generic";
 
 export type WorkspaceTab =
+  | "Home"
   | "Scenario"
   | "Discovery"
   | "Design"

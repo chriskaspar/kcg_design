@@ -1,0 +1,6 @@
+{
+  "generateDesign": "Regenerate or refine the architecture diagram and playbook for this existing scenario. Preserve and build upon the current architecture, solution content, and story where provided. Apply any changes from the scenario input and ARCHITECT answers. Include an updated story if context is sufficient.",
+  "generateSolution": "Regenerate or refine the solution narrative, playbook, and architecture options for this existing scenario. Preserve the existing architecture diagram nodes and edges unless clearly wrong. Focus on improving solution quality, recommendations, and engagement content. Include an updated story if context is sufficient.",
+  "generateStory": "Generate or refresh only the story narrative (strategy, technology, outcome, returnValue, years) for this scenario. Return the currentArchitecture and currentPlaybook unchanged — do not modify them. Base the story on the ARCHITECT framework answers and scenario context provided.",
+  "generateNew": "Generate a complete architecture, playbook, and story from scratch for this new scenario. There is no existing content to preserve — create everything based on the scenario input and ARCHITECT framework answers provided."
+}
